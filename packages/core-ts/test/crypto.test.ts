@@ -22,7 +22,7 @@ import {
   frameBounds,
   parseObjectHeader,
 } from '../src/crypto/frames.ts';
-import { Keyring, deriveDeviceKek } from '../src/crypto/keyring.ts';
+import { DEK_WRAP_AAD_PIN, Keyring, deriveDeviceKek } from '../src/crypto/keyring.ts';
 import { DeviceSecretStore } from '../src/crypto/deviceSecret.ts';
 import { TEST_KDF, cleanup, tempDir } from './helpers.ts';
 
@@ -175,7 +175,10 @@ describe('framed object encryption', () => {
 describe('keyring', () => {
   function makeKeyring(dir: string) {
     const meta = new Map<string, string>();
-    const store = { get: (k: string) => meta.get(k) ?? null, set: (k: string, v: string) => void meta.set(k, v) };
+    const store = {
+      get: (k: string) => meta.get(k) ?? null,
+      set: (k: string, v: string | null) => void (v === null ? meta.delete(k) : meta.set(k, v)),
+    };
     const device = new DeviceSecretStore({ dir: join(dir, 'keys'), forceFallback: true });
     return { keyring: new Keyring(store, device), meta };
   }
@@ -230,6 +233,54 @@ describe('keyring', () => {
     assert.equal(await keyring.unlockWithPin('123456'), false);
     assert.equal(await keyring.unlockWithPin('222222'), true);
     assert.deepEqual(Buffer.from(keyring.requireDek()), dek, 'the library is not re-encrypted');
+  });
+
+  test('dek_check catches a wrapper that opens cleanly but holds the WRONG DEK', async () => {
+    // This is the failure AES-GCM cannot see. Each wrapper authenticates in
+    // isolation: GCM proves dek_wrap_device was sealed by whoever held KEK₂, and
+    // has no way to know dek_wrap_pin exists, let alone that the two contain the
+    // same key. A device wrapper left over from an earlier provisioning — or a
+    // half-restored vault.json — unwraps perfectly and yields a key that opens
+    // nothing, and SQLCipher's only complaint is "file is not a database".
+    const { keyring, meta } = makeKeyring(tempDir());
+    await keyring.provision('123456', TEST_KDF);
+    const good = Buffer.from(keyring.requireDek());
+    keyring.lock();
+
+    const stale = new Keyring(
+      { get: (k) => meta.get(k) ?? null, set: (k, v) => void (v === null ? meta.delete(k) : meta.set(k, v)) },
+      new DeviceSecretStore({ dir: join(tempDir(), 'keys'), forceFallback: true }),
+    );
+    // Same salt and same PIN, but a DEK from a different provisioning.
+    const otherDek = randomBytes(32);
+    const salt = Buffer.from(meta.get('kdf_salt')!, 'base64');
+    const kek = deriveKekSync('123456', salt, TEST_KDF);
+    meta.set('dek_wrap_pin', seal(kek, otherDek, DEK_WRAP_AAD_PIN).toString('base64'));
+
+    assert.notDeepEqual(otherDek, good);
+    assert.equal(
+      await stale.unlockWithPin('123456'),
+      false,
+      'the envelope opens, so only dek_check can reject this',
+    );
+
+    // Remove the check and the wrong key sails straight through — which is the
+    // measurement of what dek_check is actually worth.
+    meta.delete('dek_check');
+    assert.equal(await stale.unlockWithPin('123456'), true);
+    assert.deepEqual(Buffer.from(stale.requireDek()), otherDek);
+  });
+
+  test('failed PIN attempts are counted in the store and reset on success', async () => {
+    const { keyring } = makeKeyring(tempDir());
+    await keyring.provision('123456', TEST_KDF);
+    keyring.lock();
+    assert.equal(keyring.failedPinAttempts, 0);
+    await keyring.unlockWithPin('999999');
+    await keyring.unlockWithPin('888888');
+    assert.equal(keyring.failedPinAttempts, 2);
+    assert.equal(await keyring.unlockWithPin('123456'), true);
+    assert.equal(keyring.failedPinAttempts, 0);
   });
 
   test('KEK2 derivation is deterministic', () => {

@@ -20,8 +20,19 @@ import type { DeviceSecretStrength } from './deviceSecret.ts';
  * failure modes in §3 that would otherwise destroy the library.
  */
 
+/**
+ * Domain separators — `spec/crypto.md` §2.2. These exact bytes are wire format:
+ * they are the caller AAD of each wrapped key, and they are what stops a
+ * PIN-wrapped DEK being presented as a device-wrapped one. Colons, not dots.
+ * Pinned by `spec/vectors/crypto-context.json` and, as used, by the `seal`
+ * cases in `spec/vectors/crypto-envelope.json`.
+ */
 export const DEK_WRAP_AAD_PIN = Buffer.from('things:dek-wrap:pin:v1', 'utf8');
 export const DEK_WRAP_AAD_DEVICE = Buffer.from('things:dek-wrap:device:v1', 'utf8');
+/** HKDF `info` for KEK₂ — `spec/crypto.md` §1.2. */
+export const KEK2_HKDF_INFO = Buffer.from('things:kek2:v1', 'utf8');
+/** AAD of the encrypted backup container. Reserved; no TS writer yet. */
+export const BACKUP_AAD = Buffer.from('things:backup:v1', 'utf8');
 
 export interface KeyringState {
   kdf_salt: string; // base64
@@ -47,7 +58,7 @@ export interface KeyringStore {
 
 /** KEK₂ = HKDF-SHA256(device secret). */
 export function deriveDeviceKek(deviceSecret: Uint8Array, salt: Uint8Array): Buffer {
-  const out = hkdfSync('sha256', Buffer.from(deviceSecret), Buffer.from(salt), Buffer.from('things:kek2:v1'), 32);
+  const out = hkdfSync('sha256', Buffer.from(deviceSecret), Buffer.from(salt), KEK2_HKDF_INFO, 32);
   return Buffer.from(out);
 }
 

@@ -1,6 +1,8 @@
 import { test, describe, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { applyRemoteUpdate, openConflicts, resolveConflict } from '../src/conflicts.ts';
+import { canonicalJson } from '../src/canonicalJson.ts';
+import { decodeAttrs } from '../src/oplog.ts';
 import { parseVector, stringifyVector } from '../src/versionVector.ts';
 import { cleanup, makeCore } from './helpers.ts';
 import type { Change } from '../src/types.ts';
@@ -23,6 +25,60 @@ describe('oplog', () => {
     assert.equal(attrs.title, 'Second');
     const prev = JSON.parse(changes[0].prev_json!) as Record<string, unknown>;
     assert.equal(prev.title, 'First');
+    core.close();
+  });
+
+  test('attrs_json and prev_json are canonical JSON, not insertion order', async () => {
+    const core = await makeCore();
+    const t = core.things.create({ title: 'Ordering' });
+
+    // Written in an order that is deliberately NOT sorted. core-swift cannot
+    // reproduce JavaScript insertion order at all — its dictionaries are
+    // unordered — so sorted-key canonical JSON is the only rule both cores can
+    // implement, and spec/oplog.md §2 makes it the contract.
+    const unsorted = { title: 'Second', icon_json: null, cover_object: 'obj-hash' };
+    const change = core.oplog.append({
+      entityType: 'thing',
+      entityId: t.id,
+      op: 'update',
+      attrs: unsorted,
+      prev: { title: 'First', icon_json: '{"type":"symbol","value":"star"}', cover_object: null },
+    });
+
+    assert.equal(change.attrs_json, '{"cover_object":"obj-hash","icon_json":null,"title":"Second"}');
+    assert.notEqual(change.attrs_json, JSON.stringify(unsorted), 'insertion order is not the contract');
+    assert.equal(
+      change.prev_json,
+      '{"cover_object":null,"icon_json":"{\\"type\\":\\"symbol\\",\\"value\\":\\"star\\"}","title":"First"}',
+    );
+
+    // And the ordinary repository write path produces canonical bytes too.
+    core.things.update(t.id, { is_pinned: true, title: 'Third' });
+    const viaRepo = core.oplog.entityHistory(t.id)[0];
+    assert.equal(viaRepo.attrs_json, canonicalJson(JSON.parse(viaRepo.attrs_json)));
+    core.close();
+  });
+
+  test('a secret value travels as the {"$b64": …} envelope wrapper, never as bare text', async () => {
+    const core = await makeCore();
+    const t = core.things.create({ title: 'Secrets' });
+    const f = core.fields.create({
+      thingId: t.id,
+      variant: 'password',
+      label: 'Main password',
+      value: { kind: 'secret', value: 'not-real' },
+    });
+
+    const change = core.oplog
+      .entityHistory(f.id)
+      .find((c) => c.attrs_json.includes('value_cipher'));
+    assert.ok(change, 'the ciphertext must reach the log');
+    assert.equal(change!.attrs_json, canonicalJson(JSON.parse(change!.attrs_json)));
+
+    const attrs = decodeAttrs(JSON.parse(change!.attrs_json) as Record<string, unknown>);
+    assert.ok(attrs.value_cipher instanceof Uint8Array, 'the wrapper must decode back to bytes');
+    assert.equal(Buffer.from(attrs.value_cipher as Uint8Array).subarray(0, 4).toString('ascii'), 'TENV');
+    assert.ok(!change!.attrs_json.includes('not-real'), 'History must never carry plaintext');
     core.close();
   });
 

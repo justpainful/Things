@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit          // `Color(.systemBackground)` names a UIColor member.
 
 /// Spacing rhythm, corner radii and the one place glass shapes are spelled.
 ///

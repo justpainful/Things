@@ -133,10 +133,16 @@ export const MIRRORED_KEYS = ['kdf_salt', 'kdf_params', 'dek_wrap_pin', 'dek_wra
  * means in practice.
  */
 export class MirroredVault implements KeyringStore {
-  constructor(
-    private readonly primary: KeyringStore,
-    private readonly mirror: KeyringStore,
-  ) {}
+  // Plain fields, assigned in the body: `node --test` type-strips these files
+  // rather than compiling them, and strip-only mode rejects parameter
+  // properties (as it does enums, namespaces and decorators).
+  private readonly primary: KeyringStore;
+  private readonly mirror: KeyringStore;
+
+  constructor(primary: KeyringStore, mirror: KeyringStore) {
+    this.primary = primary;
+    this.mirror = mirror;
+  }
 
   get(key: string): string | null {
     return this.primary.get(key);

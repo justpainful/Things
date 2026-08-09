@@ -166,9 +166,9 @@ final class ScreenshotTour: XCTestCase {
         // Search: idle, then results with a filter chip on.
         tapTab("Search")
         snap(13, "search-idle", mode)
-        if tap(identifier: "search.chip.accounts") {
+        if tapChip("accounts") {
             snap(14, "search-results-chips", mode)
-            _ = tap(identifier: "search.chip.accounts")
+            _ = tapChip("accounts")
         }
         typeIntoSearch("zzzz-no-such-thing")
         snap(15, "search-empty", mode)
@@ -278,8 +278,22 @@ final class ScreenshotTour: XCTestCase {
     @discardableResult
     private func tap(identifier: String) -> Bool {
         let element = app.descendants(matching: .any).matching(identifier: identifier).firstMatch
-        guard element.waitForExistence(timeout: 5), element.isHittable else {
-            print("[tour] no hittable element for identifier '\(identifier)'")
+        guard element.waitForExistence(timeout: 5) else {
+            print("[tour] no element for identifier '\(identifier)'")
+            return false
+        }
+        // At AccessibilityXXL most of these screens are two or three phone-heights tall, so
+        // a control that exists is routinely below the fold — `Settings ▸ Sync` and
+        // `Settings ▸ Diagnostics` certainly are. Scroll to it rather than quietly dropping
+        // the screenshot, which is the failure mode that leaves a green build with a hole
+        // in the middle of the tour.
+        var attempts = 0
+        while !element.isHittable && attempts < 5 {
+            app.swipeUp()
+            attempts += 1
+        }
+        guard element.isHittable else {
+            print("[tour] identifier '\(identifier)' never became hittable")
             return false
         }
         element.tap()
@@ -288,7 +302,10 @@ final class ScreenshotTour: XCTestCase {
 
     @discardableResult
     private func tapText(_ text: String) -> Bool {
-        let element = app.staticTexts[text]
+        // `.firstMatch` is not optional here. A pinned Thing appears twice on Home — once in
+        // the Pinned shelf and once in Recent — and resolving an ambiguous `XCUIElement`
+        // raises "Multiple matching elements found" instead of picking one.
+        let element = app.staticTexts[text].firstMatch
         guard element.waitForExistence(timeout: 5) else {
             print("[tour] no element with text '\(text)'")
             return false
@@ -306,9 +323,41 @@ final class ScreenshotTour: XCTestCase {
 
     @discardableResult
     private func tapFirst(label: String) -> Bool {
-        let element = app.buttons[label]
+        let element = app.buttons[label].firstMatch
         guard element.waitForExistence(timeout: 5), element.isHittable else {
             print("[tour] no button labelled '\(label)'")
+            return false
+        }
+        element.tap()
+        return true
+    }
+
+    /// The filter chips live in a horizontal scroll view that is wider than the screen at
+    /// every Dynamic Type size — "Accounts" is the eighth chip, roughly 640pt in on a 402pt
+    /// screen, and far worse at AccessibilityXXL. `tap(identifier:)` would find it, see
+    /// `isHittable == false`, and silently skip the screenshot. So scroll to it first.
+    @discardableResult
+    private func tapChip(_ id: String) -> Bool {
+        let element = app.descendants(matching: .any)
+            .matching(identifier: "search.chip.\(id)").firstMatch
+        guard element.waitForExistence(timeout: 5) else {
+            print("[tour] no chip '\(id)'")
+            return false
+        }
+        let row = app.descendants(matching: .any).matching(identifier: "search.chips").firstMatch
+        var attempts = 0
+        while !element.isHittable && attempts < 8 {
+            if row.exists {
+                row.swipeLeft()
+            } else if app.scrollViews.firstMatch.exists {
+                app.scrollViews.firstMatch.swipeLeft()
+            } else {
+                break
+            }
+            attempts += 1
+        }
+        guard element.isHittable else {
+            print("[tour] chip '\(id)' never became hittable")
             return false
         }
         element.tap()

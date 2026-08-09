@@ -6,9 +6,10 @@
 //  * GRDB comes from Zetetic's managed SQLCipher fork (SQLCipher already wired in).
 //    Pinned exactly, because a silent minor bump on a machine that cannot compile
 //    locally is a 10-minute CI round trip to discover.
-//  * swift-crypto is here for ONE symbol: `KDF.Insecure.Scrypt`. CryptoKit ships no
-//    memory-hard KDF. Everything else (AES-GCM, HKDF, SHA-256, P-256, Secure Enclave)
-//    is CryptoKit.
+//  * swift-crypto is here for ONE symbol: `KDF.Scrypt`, from `_CryptoExtras`. Note the
+//    namespace — PBKDF2 is `KDF.Insecure.PBKDF2`, but scrypt is NOT under `Insecure`.
+//    CryptoKit ships no memory-hard KDF. Everything else (AES-GCM, HKDF, SHA-256, P-256,
+//    Secure Enclave) is CryptoKit.
 //  * Swift 5 language mode on purpose. The code is written Sendable-clean, but the
 //    first compile of this package happens on a CI runner with no way to iterate,
 //    and Swift 6 mode turns concurrency nits into hard errors.

@@ -107,6 +107,10 @@ jobs:
       # ── ONE build, two test runs ──────────────────────────────────────────
       # `xcodebuild test` twice was compiling the app twice. build-for-testing compiles once;
       # each test-without-building then costs only the run itself.
+      # Raw output is TEE'd to a file before xcbeautify sees it. xcbeautify makes logs readable
+      # but it drops linker diagnostics entirely — a failed `Ld` step showed "build commands
+      # failed" and nothing about which symbol was undefined, which is undiagnosable from a
+      # Windows machine 4000 km from the runner. Never throw the raw log away.
       - name: Build for testing
         working-directory: apps/ios
         run: |
@@ -117,7 +121,25 @@ jobs:
             -derivedDataPath "$PWD/${DD}" \
             -skipPackagePluginValidation -skipMacroValidation \
             ONLY_ACTIVE_ARCH=YES \
-            CODE_SIGNING_ALLOWED=NO | xcbeautify
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee build.log | xcbeautify
+
+      # Runs only when the build failed. Surfaces the diagnostics xcbeautify hid.
+      - name: Show real build errors
+        if: failure()
+        working-directory: apps/ios
+        run: |
+          echo "──────── error: / warning: lines ────────"
+          grep -nE "error:|Undefined symbol|symbol\(s\) not found|ld: " build.log | head -60 || true
+          echo ""
+          echo "──────── context around the first failure ────────"
+          n=$(grep -nE "error:|Undefined symbol|ld: " build.log | head -1 | cut -d: -f1)
+          if [ -n "$n" ]; then
+            start=$(( n > 40 ? n - 40 : 1 ))
+            sed -n "${start},$(( n + 60 ))p" build.log
+          else
+            echo "(no error: line found — showing the tail)"
+            tail -120 build.log
+          fi
 
       # Includes the startup diagnostic for the one genuinely unverified dependency assumption:
       # whether FTS5 is compiled into Zetetic's prebuilt SQLCipher binary.
