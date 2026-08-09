@@ -477,8 +477,14 @@ public struct ThingRepository: Sendable {
                     WHERE deleted_at IS NULL AND is_template = 0
                     ORDER BY COALESCE(viewed_at, updated_at) DESC LIMIT \(ThingRepository.recentLimit)
                     """),
+                // `is_smart` first, so the user's OWN collections come before the seeded
+                // Smart Views. The smart views are installed at first launch and therefore
+                // hold the lowest sort_order, which meant Home's five-collection shelf was
+                // five smart views and none of 1980 / Development / Gaming — the user's
+                // organisation was invisible on the screen built to surface it.
                 collections: try ThingCollection.fetchAll(db, sql: """
-                    SELECT * FROM collection WHERE parent_id IS NULL ORDER BY sort_order
+                    SELECT * FROM collection WHERE parent_id IS NULL
+                    ORDER BY is_smart, sort_order
                     """),
                 suggestions: try Thing.fetchAll(db, sql: """
                     SELECT thing.*, \(ThingSQL.dominantVariant) FROM thing

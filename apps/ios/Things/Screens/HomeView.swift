@@ -126,8 +126,13 @@ struct HomeView: View {
                                 }
                             }
                             .padding(.vertical, Theme.Spacing.tight)
+                            .scrollTargetLayout()
                         }
                         .scrollIndicators(.hidden)
+                        // Cards snap to a card edge, so the shelf never comes to rest showing
+                        // a title sliced mid-glyph. At AccessibilityXXL two cards are wider
+                        // than the screen, and "1980 Website" was settling as "19 / We".
+                        .scrollTargetBehavior(.viewAligned)
                         .listRowInsets(EdgeInsets(top: 0, leading: Theme.Spacing.medium,
                                                   bottom: 0, trailing: 0))
                     }
