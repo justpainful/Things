@@ -34,7 +34,13 @@ let package = Package(
             name: "ThingsCore",
             dependencies: [
                 .product(name: "GRDB", package: "GRDB.swift"),
-                .product(name: "Crypto", package: "swift-crypto"),
+                // ONLY _CryptoExtras. Do NOT add the `Crypto` product back.
+                //
+                // On Apple platforms swift-crypto's `Crypto` is just a re-export of CryptoKit,
+                // so it adds no API — but declaring it as a package PRODUCT made Xcode expect a
+                // `Crypto_…_PackageProduct.framework` that it never built, and the link step
+                // died with "no such file or directory". Sources import CryptoKit directly;
+                // `_CryptoExtras` links its own copy of the Crypto target internally.
                 .product(name: "_CryptoExtras", package: "swift-crypto")
             ],
             // The whole directory, copied verbatim, so it lands in the bundle as

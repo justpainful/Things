@@ -1,6 +1,12 @@
 import Foundation
-import Crypto
+import CryptoKit
 import _CryptoExtras
+
+// CryptoKit, not swift-crypto's `Crypto`. On Apple platforms the `Crypto` module compiles
+// down to a re-export of CryptoKit, so importing it buys nothing — but depending on it as a
+// PACKAGE PRODUCT made Xcode try to link a `Crypto_…_PackageProduct.framework` that it never
+// built, failing the whole build at the link step. `SymmetricKey` here is the same type either
+// way, so `_CryptoExtras` composes with CryptoKit exactly as it did with `Crypto`.
 
 /// **This is the only file in the project that imports `_CryptoExtras`.**
 ///
