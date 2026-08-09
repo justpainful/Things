@@ -255,7 +255,7 @@ final class ScreenshotTour: XCTestCase {
     /// nothing gets photographed.
     private func assertSeedDataset() {
         let marker = app.staticTexts["seed.marker"]
-        XCTAssertTrue(marker.waitForExistence(timeout: 20),
+        XCTAssertTrue(marker.waitForExistence(timeout: 12),
                       "The seed marker is absent — refusing to photograph a library that may be real.")
     }
 
@@ -301,7 +301,7 @@ final class ScreenshotTour: XCTestCase {
     @discardableResult
     private func tap(identifier: String) -> Bool {
         let element = app.descendants(matching: .any).matching(identifier: identifier).firstMatch
-        guard element.waitForExistence(timeout: 5) else {
+        guard element.waitForExistence(timeout: 2) else {
             print("[tour] no element for identifier '\(identifier)'")
             return false
         }
@@ -311,7 +311,7 @@ final class ScreenshotTour: XCTestCase {
         // the screenshot, which is the failure mode that leaves a green build with a hole
         // in the middle of the tour.
         var attempts = 0
-        while !canTouch(element) && attempts < 5 {
+        while !canTouch(element) && attempts < 3 {
             app.swipeUp()
             attempts += 1
         }
@@ -329,16 +329,16 @@ final class ScreenshotTour: XCTestCase {
         // the Pinned shelf and once in Recent — and resolving an ambiguous `XCUIElement`
         // raises "Multiple matching elements found" instead of picking one.
         let element = app.staticTexts[text].firstMatch
-        guard element.waitForExistence(timeout: 5) else {
+        guard element.waitForExistence(timeout: 2) else {
             print("[tour] no element with text '\(text)'")
             return false
         }
-        if element.isHittable {
+        if canTouch(element) {
             element.tap()
         } else {
             // A row that is scrolled off, or clipped by a long title: nudge it into view.
             app.swipeUp()
-            guard element.waitForExistence(timeout: 2), element.isHittable else { return false }
+            guard element.waitForExistence(timeout: 2), canTouch(element) else { return false }
             element.tap()
         }
         return true
@@ -347,7 +347,7 @@ final class ScreenshotTour: XCTestCase {
     @discardableResult
     private func tapFirst(label: String) -> Bool {
         let element = app.buttons[label].firstMatch
-        guard element.waitForExistence(timeout: 5), element.isHittable else {
+        guard element.waitForExistence(timeout: 3), canTouch(element) else {
             print("[tour] no button labelled '\(label)'")
             return false
         }
@@ -363,13 +363,13 @@ final class ScreenshotTour: XCTestCase {
     private func tapChip(_ id: String) -> Bool {
         let element = app.descendants(matching: .any)
             .matching(identifier: "search.chip.\(id)").firstMatch
-        guard element.waitForExistence(timeout: 5) else {
+        guard element.waitForExistence(timeout: 2) else {
             print("[tour] no chip '\(id)'")
             return false
         }
         let row = app.descendants(matching: .any).matching(identifier: "search.chips").firstMatch
         var attempts = 0
-        while !canTouch(element) && attempts < 8 {
+        while !canTouch(element) && attempts < 4 {
             if row.exists {
                 row.swipeLeft()
             } else if app.scrollViews.firstMatch.exists {
@@ -389,13 +389,13 @@ final class ScreenshotTour: XCTestCase {
 
     private func tapTab(_ title: String) {
         let tab = app.tabBars.buttons[title]
-        if tab.waitForExistence(timeout: 5), tab.isHittable {
+        if tab.waitForExistence(timeout: 3), canTouch(tab) {
             tab.tap()
             return
         }
         // The tab bar minimises on scroll down; scrolling back up brings it in.
         app.swipeDown()
-        if tab.waitForExistence(timeout: 3), tab.isHittable {
+        if tab.waitForExistence(timeout: 2), canTouch(tab) {
             tab.tap()
         } else {
             print("[tour] could not reach the '\(title)' tab")
@@ -404,7 +404,7 @@ final class ScreenshotTour: XCTestCase {
 
     private func back() {
         let backButton = app.navigationBars.buttons.element(boundBy: 0)
-        if backButton.exists, backButton.isHittable {
+        if canTouch(backButton) {
             backButton.tap()
         }
     }
@@ -417,7 +417,7 @@ final class ScreenshotTour: XCTestCase {
 
     private func typeIntoSearch(_ text: String) {
         let field = app.searchFields.firstMatch
-        guard field.waitForExistence(timeout: 5) else {
+        guard field.waitForExistence(timeout: 2) else {
             print("[tour] no search field")
             return
         }
