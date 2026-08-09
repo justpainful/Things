@@ -229,7 +229,10 @@ struct AddFieldValueStep: View {
             }
 
         case .secret:
-            Section("Value") {
+            // `Section(_ title:, content:, footer:)` does not exist in SwiftUI — a Section
+            // takes EITHER a string title OR a footer closure, never both. The header has to
+            // become a closure too.
+            Section {
                 SecureField("Value", text: $secret)
                     .textContentType(textContentType)
                     .textInputAutocapitalization(.never)
@@ -238,6 +241,8 @@ struct AddFieldValueStep: View {
                     .focused($isValueFocused)
                     .frame(minHeight: 44)
                     .accessibilityIdentifier(A11y.AddField.valueField)
+            } header: {
+                Text("Value")
             } footer: {
                 Text("Secrets are encrypted before they are written. Things never stores one in the clear, and it never appears in search.")
             }
@@ -309,13 +314,15 @@ struct AddFieldValueStep: View {
             }
 
         case .tagList:
-            Section("Tags") {
+            Section {
                 TextField("Tags", text: $text, prompt: Text("work, urgent"))
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .focused($isValueFocused)
                     .frame(minHeight: 44)
                     .accessibilityIdentifier(A11y.AddField.valueField)
+            } header: {
+                Text("Tags")
             } footer: {
                 Text("Separate tags with commas.")
             }
@@ -333,7 +340,7 @@ struct AddFieldValueStep: View {
             }
 
         default:
-            Section("Value") {
+            Section {
                 TextField("Value", text: $text)
                     .keyboardType(keyboardType)
                     .textContentType(textContentType)
@@ -342,6 +349,8 @@ struct AddFieldValueStep: View {
                     .focused($isValueFocused)
                     .frame(minHeight: 44)
                     .accessibilityIdentifier(A11y.AddField.valueField)
+            } header: {
+                Text("Value")
             } footer: {
                 if let message = validationMessage {
                     Text(message)

@@ -126,7 +126,7 @@ struct DiagnosticsSheet: View {
         NavigationStack {
             Form {
                 if let diagnostics {
-                    Section("Storage") {
+                    Section {
                         LabeledContent("SQLite", value: diagnostics.sqliteVersion)
                         LabeledContent("SQLCipher", value: diagnostics.cipherVersion ?? "Not detected")
                         LabeledContent("Encrypted", value: diagnostics.isEncrypted ? "Yes" : "No")
@@ -134,6 +134,8 @@ struct DiagnosticsSheet: View {
                     Section {
                         LabeledContent("Full-text search",
                                        value: diagnostics.hasFTS5 ? "FTS5" : "Fallback (LIKE)")
+                    } header: {
+                        Text("Storage")
                     } footer: {
                         Text(diagnostics.hasFTS5
                              ? "Search uses SQLite's full-text index."

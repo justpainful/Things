@@ -30,7 +30,7 @@ struct CollectionsView: View {
                         let smart = collections.filter { $0.isSmart }
 
                         if !manual.isEmpty {
-                            Section("Collections") {
+                            Section {
                                 ForEach(manual) { collection in
                                     row(collection)
                                 }
@@ -43,6 +43,8 @@ struct CollectionsView: View {
                                 }
                             } header: {
                                 Text("Smart Views")
+                            } header: {
+                                Text("Collections")
                             } footer: {
                                 Text("Smart Views are saved searches. Edit one and it stays yours.")
                             }
