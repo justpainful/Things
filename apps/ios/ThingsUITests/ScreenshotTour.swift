@@ -55,14 +55,21 @@ final class ScreenshotTour: XCTestCase {
             return arguments
         }
 
-        static let all: [Mode] = [
+        /// Every screen is captured at these two.
+        static let standard: [Mode] = [
             Mode(name: "light", appearance: "light", contentSize: nil),
-            Mode(name: "dark", appearance: "dark", contentSize: nil),
+            Mode(name: "dark", appearance: "dark", contentSize: nil)
+        ]
+
+        /// Only the screens where Dynamic Type actually breaks layout.
+        static let accessibility: [Mode] = [
             Mode(name: "light-xxl", appearance: "light",
                  contentSize: "UICTContentSizeCategoryAccessibilityXXL"),
             Mode(name: "dark-xxl", appearance: "dark",
                  contentSize: "UICTContentSizeCategoryAccessibilityXXL")
         ]
+
+        static let all: [Mode] = standard + accessibility
     }
 
     private static let launchEnvironment = ["TZ": "UTC"]
@@ -74,12 +81,63 @@ final class ScreenshotTour: XCTestCase {
 
     // MARK: - The tour
 
+    /// Full walk at the two standard sizes; a short stress walk at the accessibility sizes.
+    ///
+    /// Four full passes cost 30 minutes and blew the job's time limit. The accessibility
+    /// passes were most of that and earned the least: Dynamic Type breaks on a handful of
+    /// dense screens, and photographing Settings at XXL for the fourth time proves nothing.
+    /// This keeps the accessibility signal exactly where layout actually fails and cuts the
+    /// run from twelve app launches to eight.
     func testScreenshotTour() {
-        for mode in Mode.all {
+        for mode in Mode.standard {
             walkMainFlow(mode)
             walkLockScreen(mode)
             walkPrivacyMode(mode)
         }
+        for mode in Mode.accessibility {
+            walkStressScreens(mode)
+        }
+    }
+
+    /// The screens where Dynamic Type actually breaks things: dense rows, long titles,
+    /// two-column cards, and anything with a trailing timestamp.
+    private func walkStressScreens(_ mode: Mode) {
+        launch(mode)
+        assertSeedDataset()
+
+        snap(1, "home", mode)
+        homeScrolledToBottom(mode)
+
+        if tapText("Cloudflare") {
+            snap(3, "thing-detail-fields", mode)
+            back()
+        }
+        if tapText("Everything, All At Once") {
+            snap(7, "thing-detail-sections", mode)
+            back()
+        }
+        tapTab("Search")
+        snap(13, "search-idle", mode)
+        tapTab("Collections")
+        snap(16, "collections", mode)
+
+        app.terminate()
+    }
+
+    /// Scrolls Home to the very bottom and photographs it.
+    ///
+    /// This exists to answer one question that a top-of-scroll screenshot cannot: is the last
+    /// row reachable, or is it stranded under the floating tab bar? Content passing *behind*
+    /// glass is Apple's intended behaviour; content you can never scroll into the clear is a
+    /// bug. Those two look identical at the top of a list, which is why the first three
+    /// attempts at this were guesses.
+    private func homeScrolledToBottom(_ mode: Mode) {
+        for _ in 0..<6 { app.swipeUp() }
+        // Index 1, not 2: this belongs next to Home in a sorted listing, and index 2 is
+        // already All Things. Renumbering twenty-seven downstream snaps to insert one
+        // screenshot would be a much better way to lose a screenshot than to gain one.
+        snap(1, "home-scrolled-bottom", mode)
+        for _ in 0..<7 { app.swipeDown() }
     }
 
     // MARK: - Pass 1 — everything reachable from an unlocked app
@@ -89,6 +147,7 @@ final class ScreenshotTour: XCTestCase {
         assertSeedDataset()
 
         snap(1, "home", mode)
+        homeScrolledToBottom(mode)
 
         // All Things
         if tap(identifier: "home.allThings") {
