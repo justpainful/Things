@@ -75,7 +75,27 @@ final class AppModel {
             self.locations = locations
             let vault = Vault(storage: FileVaultStorage(url: locations.vaultURL), clock: SystemClock.shared)
             self.vault = vault
-            phase = try vault.state().isInitialised ? .locked : .setup
+
+            // No PIN. Ever.
+            //
+            // On first run the library creates itself and opens — there is no passcode to
+            // invent and no setup screen to get through. The DEK is protected by this
+            // device's keychain, which is the phone's own passcode, and optionally Face ID
+            // if the user turns it on in Settings. That is how a normal iOS app behaves.
+            //
+            // The trade is stated plainly in Vault.initialiseDeviceOnly: with no passphrase
+            // there is no second way in, so encrypted backup is the recovery path.
+            if try vault.state().isInitialised {
+                if vault.requiresBiometrics {
+                    phase = .locked
+                } else {
+                    let dek = try vault.unlockWithDevice()
+                    try openLibrary(dek: dek, locations: locations)
+                }
+            } else {
+                let dek = try vault.initialiseDeviceOnly()
+                try openLibrary(dek: dek, locations: locations)
+            }
         } catch {
             phase = .failed("Things could not open its storage. \(error)")
         }
@@ -164,6 +184,23 @@ final class AppModel {
         }
     }
 
+    /// Whether opening Things demands Face ID. Off by default.
+    var requiresBiometrics: Bool { vault?.requiresBiometrics ?? false }
+
+    /// Turning this on or off re-wraps the key under a new keychain policy — an access
+    /// control cannot be edited in place. It is done inside `Vault` in an order where a
+    /// failure leaves the old, working wrapper on disk.
+    func setBiometricRequirement(_ required: Bool) {
+        guard let vault, !configuration.isUITesting else { return }
+        do {
+            try vault.setBiometricRequirement(required)
+        } catch {
+            errorMessage = required
+                ? "Face ID could not be turned on. \(error.localizedDescription)"
+                : "Face ID could not be turned off. \(error.localizedDescription)"
+        }
+    }
+
     func unlockWithDevice() {
         if configuration.isUITesting {
             phase = .unlocked
@@ -175,7 +212,7 @@ final class AppModel {
             failedAttempts = 0
             try openLibrary(dek: dek, locations: locations)
         } catch {
-            unlockMessage = "Face ID is not available for this library. Use your PIN."
+            unlockMessage = "Face ID could not open Things. \(error.localizedDescription)"
         }
     }
 

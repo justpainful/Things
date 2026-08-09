@@ -53,7 +53,17 @@ public final class DeviceKeyStore: @unchecked Sendable {
     /// Derives the device KEK, creating and persisting the underlying key on first use.
     ///
     /// - Parameter salt: stored in `meta`, alongside the PIN salt.
-    public func deriveKEK(salt: Data, info: String = KeyHierarchy.Context.deviceAgreement) throws -> SymmetricKey {
+    /// - Parameter requireBiometrics: when `true` the underlying enclave key is created with
+    ///   `.biometryCurrentSet`, so using it demands Face ID. When `false` the key needs only an
+    ///   unlocked device.
+    ///
+    ///   These are two DIFFERENT keychain items on purpose (see `blobAccount`). An access
+    ///   control policy is fixed at creation and cannot be edited, so flipping the setting has
+    ///   to mint a new key and re-wrap the DEK under it — never mutate one in place, which
+    ///   would strand the library behind a key nobody can use.
+    public func deriveKEK(salt: Data,
+                          info: String = KeyHierarchy.Context.deviceAgreement,
+                          requireBiometrics: Bool = false) throws -> SymmetricKey {
         lock.lock()
         defer { lock.unlock() }
 
@@ -61,7 +71,7 @@ public final class DeviceKeyStore: @unchecked Sendable {
         return try softwareKEK(salt: salt, info: info)
         #else
         if SecureEnclave.isAvailable {
-            return try enclaveKEK(salt: salt, info: info)
+            return try enclaveKEK(salt: salt, info: info, requireBiometrics: requireBiometrics)
         }
         return try softwareKEK(salt: salt, info: info)
         #endif
@@ -72,29 +82,33 @@ public final class DeviceKeyStore: @unchecked Sendable {
     public func reset() throws {
         lock.lock()
         defer { lock.unlock() }
-        try deleteStoredBlob()
+        try deleteStoredBlob(requireBiometrics: false)
+        try deleteStoredBlob(requireBiometrics: true)
     }
 
     // MARK: - Secure Enclave path
 
     #if !targetEnvironment(simulator)
-    private func enclaveKEK(salt: Data, info: String) throws -> SymmetricKey {
+    private func enclaveKEK(salt: Data, info: String, requireBiometrics: Bool) throws -> SymmetricKey {
         let privateKey: SecureEnclave.P256.KeyAgreement.PrivateKey
-        if let blob = try loadStoredBlob() {
+        if let blob = try loadStoredBlob(requireBiometrics: requireBiometrics) {
             privateKey = try SecureEnclave.P256.KeyAgreement.PrivateKey(dataRepresentation: blob)
         } else {
             var accessError: Unmanaged<CFError>?
+            let flags: SecAccessControlCreateFlags = requireBiometrics
+                ? [.privateKeyUsage, .biometryCurrentSet]
+                : [.privateKeyUsage]
             guard let access = SecAccessControlCreateWithFlags(
                 nil,
                 kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly,
-                [.privateKeyUsage, .biometryCurrentSet],
+                flags,
                 &accessError
             ) else {
                 let code = accessError.map { CFErrorGetCode($0.takeRetainedValue()) } ?? -1
                 throw ThingsError.keychainFailure(status: Int32(code), operation: "SecAccessControlCreateWithFlags")
             }
             privateKey = try SecureEnclave.P256.KeyAgreement.PrivateKey(accessControl: access)
-            try storeBlob(privateKey.dataRepresentation)
+            try storeBlob(privateKey.dataRepresentation, requireBiometrics: requireBiometrics)
         }
         let shared = try privateKey.sharedSecretFromKeyAgreement(with: privateKey.publicKey)
         return KeyHierarchy.deriveKEK(fromSharedSecret: shared, salt: salt, info: info)
@@ -117,17 +131,27 @@ public final class DeviceKeyStore: @unchecked Sendable {
 
     // MARK: - Keychain
 
-    private func baseQuery() -> [String: Any] {
+    /// Biometric and non-biometric keys live under different accounts.
+    ///
+    /// A `SecAccessControl` policy is fixed when the key is created and cannot be edited
+    /// afterwards. Sharing one account between the two modes would mean the stored blob no
+    /// longer matches the policy the caller asked for, and the enclave would refuse it —
+    /// with the library sitting behind it.
+    private func blobAccount(requireBiometrics: Bool) -> String {
+        requireBiometrics ? "\(account).bio" : account
+    }
+
+    private func baseQuery(requireBiometrics: Bool = false) -> [String: Any] {
         [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: account
+            kSecAttrAccount as String: blobAccount(requireBiometrics: requireBiometrics)
             // Deliberately NO kSecAttrAccessGroup. See the type comment.
         ]
     }
 
-    private func loadStoredBlob() throws -> Data? {
-        var query = baseQuery()
+    private func loadStoredBlob(requireBiometrics: Bool = false) throws -> Data? {
+        var query = baseQuery(requireBiometrics: requireBiometrics)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
 
@@ -143,9 +167,9 @@ public final class DeviceKeyStore: @unchecked Sendable {
         }
     }
 
-    private func storeBlob(_ data: Data) throws {
-        try deleteStoredBlob()
-        var query = baseQuery()
+    private func storeBlob(_ data: Data, requireBiometrics: Bool = false) throws {
+        try deleteStoredBlob(requireBiometrics: requireBiometrics)
+        var query = baseQuery(requireBiometrics: requireBiometrics)
         query[kSecValueData as String] = data
         query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         let status = SecItemAdd(query as CFDictionary, nil)
@@ -154,8 +178,8 @@ public final class DeviceKeyStore: @unchecked Sendable {
         }
     }
 
-    private func deleteStoredBlob() throws {
-        let status = SecItemDelete(baseQuery() as CFDictionary)
+    private func deleteStoredBlob(requireBiometrics: Bool = false) throws {
+        let status = SecItemDelete(baseQuery(requireBiometrics: requireBiometrics) as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else {
             throw ThingsError.keychainFailure(status: status, operation: "delete")
         }

@@ -26,18 +26,32 @@ struct SettingsView: View {
                 Text("Masks secrets, emails and phone numbers on screen. It hides them from the person next to you — it is not a lock.")
             }
 
-            Section("Security") {
-                Button {
-                    model.lock()
-                } label: {
-                    Label("Lock Now", systemImage: "lock")
+            Section {
+                Toggle(isOn: Binding(
+                    get: { model.requiresBiometrics },
+                    set: { model.setBiometricRequirement($0) }
+                )) {
+                    Label("Require Face ID", systemImage: "faceid")
                 }
-                .accessibilityIdentifier(A11y.Settings.lockNow)
+                .disabled(!DeviceKeyStore.isSecureEnclaveAvailable)
+                .accessibilityIdentifier(A11y.Settings.requireFaceID)
 
-                LabeledContent("Unlock") {
-                    Text(DeviceKeyStore.isSecureEnclaveAvailable ? "Face ID and PIN" : "PIN only")
-                        .foregroundStyle(.secondary)
+                if model.requiresBiometrics {
+                    Button {
+                        model.lock()
+                    } label: {
+                        Label("Lock Now", systemImage: "lock")
+                    }
+                    .accessibilityIdentifier(A11y.Settings.lockNow)
                 }
+            } header: {
+                Text("Security")
+            } footer: {
+                // Says what is true rather than what sounds reassuring: there is no PIN, so
+                // there is no second way in if the keychain becomes unreachable.
+                Text(DeviceKeyStore.isSecureEnclaveAvailable
+                     ? "Your library is encrypted with a key held in this iPhone's keychain. Turn this on to also require Face ID each time Things opens. There is no PIN and no password to recover — keep an encrypted backup."
+                     : "This device has no Secure Enclave, so Face ID is unavailable here. Your library is encrypted with a key held in the keychain.")
             }
 
             Section("Library") {

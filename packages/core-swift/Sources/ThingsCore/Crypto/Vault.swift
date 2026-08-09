@@ -146,7 +146,60 @@ public struct Vault: Sendable {
         )
     }
 
+    /// Whether opening this library demands Face ID.
+    public var requiresBiometrics: Bool {
+        (try? storage.value(forKey: MetaKey.biometricsRequired)) == "1"
+    }
+
     // MARK: - Setup
+
+    /// First run with **no PIN at all**.
+    ///
+    /// The DEK is protected solely by this device's keychain, which on iOS means the phone's
+    /// own passcode and, optionally, Face ID. That is the standard iOS model and it is what
+    /// the owner asked for: no PIN, Face ID optional.
+    ///
+    /// The trade is real and worth stating: there is no passphrase to fall back on. If the
+    /// keychain item becomes unreachable — a new Apple ID changes the team prefix, or a
+    /// sideloader rewrites the bundle identifier — the library cannot be opened by any other
+    /// route. **Encrypted backup is the recovery path**, and it is no longer optional.
+    @discardableResult
+    public func initialiseDeviceOnly(requireBiometrics: Bool = false,
+                                     dek: SymmetricKey? = nil) throws -> SymmetricKey {
+        let key = dek ?? KeyHierarchy.generateDEK(clock: clock)
+        let salt = KeyHierarchy.generateSalt(clock: clock)
+
+        try storage.setValue(salt.base64EncodedString(), forKey: MetaKey.kdfSalt)
+        try storage.setValue(nil, forKey: MetaKey.dekWrapPIN)
+        try storage.setValue(requireBiometrics ? "1" : "0", forKey: MetaKey.biometricsRequired)
+
+        let kek = try deviceKeyStore.deriveKEK(salt: salt, requireBiometrics: requireBiometrics)
+        let wrap = try KeyHierarchy.wrap(key, with: kek, context: KeyHierarchy.Context.deviceWrap)
+        try storage.setValue(wrap.base64EncodedString(), forKey: MetaKey.dekWrapDevice)
+        return key
+    }
+
+    /// Turns the Face ID requirement on or off.
+    ///
+    /// An access control policy cannot be edited after a key exists, so this unlocks with the
+    /// current key, mints a key under the new policy, re-wraps the DEK, and only then writes
+    /// the new setting. Order matters: if the new wrap fails, the old one is still the one on
+    /// disk and the library still opens.
+    public func setBiometricRequirement(_ required: Bool) throws {
+        let current = requiresBiometrics
+        guard current != required else { return }
+
+        let dek = try unlockWithDevice()
+        guard let saltText = try storage.value(forKey: MetaKey.kdfSalt),
+              let salt = Data(base64Encoded: saltText)
+        else { throw ThingsError.cryptoFailure("this library has no salt") }
+
+        let kek = try deviceKeyStore.deriveKEK(salt: salt, requireBiometrics: required)
+        let wrap = try KeyHierarchy.wrap(dek, with: kek, context: KeyHierarchy.Context.deviceWrap)
+        try storage.setValue(wrap.base64EncodedString(), forKey: MetaKey.dekWrapDevice)
+        try storage.setValue(required ? "1" : "0", forKey: MetaKey.biometricsRequired)
+    }
+
 
     /// First run. Creates the DEK and both wrappers.
     @discardableResult
@@ -213,7 +266,7 @@ public struct Vault: Sendable {
               let salt = Data(base64Encoded: saltText)
         else { throw ThingsError.cryptoFailure("this library has no device wrapper") }
 
-        let kek = try deviceKeyStore.deriveKEK(salt: salt)
+        let kek = try deviceKeyStore.deriveKEK(salt: salt, requireBiometrics: requiresBiometrics)
         return try KeyHierarchy.unwrap(wrap, with: kek, context: KeyHierarchy.Context.deviceWrap)
     }
 

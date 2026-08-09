@@ -64,8 +64,6 @@ enum A11y {
 
     enum Lock {
         static let root = "lock.root"
-        static let keypad = "lock.keypad"
-        static func digit(_ value: Int) -> String { "lock.digit.\(value)" }
         static let faceID = "lock.faceID"
     }
 
@@ -73,6 +71,7 @@ enum A11y {
         static let root = "settings.root"
         static let privacyToggle = "settings.privacyMode"
         static let lockNow = "settings.lockNow"
+        static let requireFaceID = "settings.requireFaceID"
         static let trash = "settings.trash"
         static let history = "settings.history"
         static let conflicts = "settings.conflicts"

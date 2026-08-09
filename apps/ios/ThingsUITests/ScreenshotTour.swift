@@ -272,12 +272,9 @@ final class ScreenshotTour: XCTestCase {
     private func walkLockScreen(_ mode: Mode) {
         launch(mode, extraArguments: ["-ThingsStartLocked"])
         _ = app.otherElements["lock.root"].waitForExistence(timeout: 8)
+        // There is no keypad any more, so there is no partially-filled state to capture.
+        // Face ID is the only control on this screen.
         snap(24, "lock", mode)
-
-        // Two digits in, so the tour also captures the partially-filled state.
-        _ = tap(identifier: "lock.digit.1")
-        _ = tap(identifier: "lock.digit.2")
-        snap(25, "lock-entering", mode)
 
         app.terminate()
     }

@@ -229,6 +229,9 @@ public enum MetaKey {
     public static let dekWrapDevice = "dek_wrap_device"
     public static let kdfParams = "kdf_params"
     public static let kdfSalt = "kdf_salt"
+    /// "1" when opening the library demands Face ID. Absent or "0" means an unlocked
+    /// device is enough — which is the default, and what the owner asked for.
+    public static let biometricsRequired = "biometrics_required"
     /// Legacy. The device KEK is now salted with `kdf_salt`, per `spec/crypto.md` §3, so
     /// nothing writes this key any more. Kept so an older sidecar still parses.
     public static let deviceSalt = "device_salt"
