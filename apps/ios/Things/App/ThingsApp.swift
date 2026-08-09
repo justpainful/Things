@@ -99,17 +99,26 @@ struct MainTabs: View {
         // Tab bar buttons are queried by their visible titles in the Screenshot Tour:
         // `TabContent` is not a `View`, so `.accessibilityIdentifier` cannot be attached
         // to a `Tab` the way it can to everything else in this app.
+        //
+        // `thingsTabBarClearance()` is applied here and nowhere else. The floating tab bar
+        // sits *over* the tab's content, so without a reserved strip the bottom row of every
+        // scroll view in the app ends up under glass — illegible and unreachable. Applying
+        // it to each tab's root (which is a `NavigationStack`) means every screen pushed
+        // inside that stack inherits it, and no screen can be padded twice.
         TabView {
             Tab("Things", systemImage: "square.stack") {
                 HomeView()
+                    .thingsTabBarClearance()
             }
 
             Tab("Collections", systemImage: "folder") {
                 CollectionsView()
+                    .thingsTabBarClearance()
             }
 
             Tab(role: .search) {
                 SearchView()
+                    .thingsTabBarClearance()
             }
         }
         .tabBarMinimizeBehavior(.onScrollDown)

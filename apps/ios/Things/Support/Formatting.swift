@@ -7,7 +7,20 @@ import ThingsCore
 /// changed, and a pixel diff that cries wolf is ignored within a week.
 enum RelativeTime {
 
-    static func string(fromISO8601 text: String?, nowMilliseconds: Int64) -> String {
+    /// How much room the caller has.
+    ///
+    /// `.short` exists for AccessibilityXXL, where "2 hours ago" truncates to "2 hours a…"
+    /// in a list row. Shortening the *words* is the right answer; shrinking the *type* would
+    /// defeat the accessibility setting the user chose. Still plain English — "2 hr", not
+    /// "2h" and certainly not a duration format nobody speaks.
+    enum Style {
+        case full
+        case short
+    }
+
+    static func string(fromISO8601 text: String?,
+                       nowMilliseconds: Int64,
+                       style: Style = .full) -> String {
         guard let text, let then = Timestamp.milliseconds(fromISO8601: text) else { return "—" }
         let delta = nowMilliseconds - then
 
@@ -15,20 +28,23 @@ enum RelativeTime {
         let hour = 60 * minute
         let day = 24 * hour
 
-        if delta < 0 { return "Just now" }
-        if delta < minute { return "Just now" }
+        let isShort = style == .short
+
+        if delta < minute { return isShort ? "Now" : "Just now" }
         if delta < hour {
             let minutes = delta / minute
+            if isShort { return "\(minutes) min" }
             return "\(minutes) minute\(minutes == 1 ? "" : "s") ago"
         }
         if delta < day {
             let hours = delta / hour
+            if isShort { return "\(hours) hr" }
             return "\(hours) hour\(hours == 1 ? "" : "s") ago"
         }
         if delta < 2 * day { return "Yesterday" }
         if delta < 7 * day {
             let days = delta / day
-            return "\(days) days ago"
+            return isShort ? "\(days) days" : "\(days) days ago"
         }
         return absoluteDay(text)
     }

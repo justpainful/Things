@@ -1,6 +1,35 @@
 import Foundation
 import GRDB
 
+/// SQL fragments shared by every query that feeds a list of Things.
+public enum ThingSQL {
+
+    /// The dominant field variant, as an extra selected column named `dominant_variant`.
+    ///
+    /// Why this exists: `icon_json.type = 'auto'` resolves its SF Symbol from the Thing's
+    /// fields, but the list queries fetch `thing` rows only. Without this column every
+    /// automatic icon fell back to the generic `square.stack` and the whole library rendered
+    /// as one glyph in twelve tints.
+    ///
+    /// A correlated subquery rather than a join, for two reasons: the row shape stays
+    /// `thing.*` so nothing else has to change, and it is one statement rather than one
+    /// query per row. `idx_field_thing(thing_id, sort_order)` covers the inner scan.
+    ///
+    /// **Deterministic by construction** — most frequent first, ties broken alphabetically —
+    /// because the Screenshot Tour diffs pixels, and an icon that depended on row order
+    /// would flag every screen on every run.
+    ///
+    /// The outer query must expose the table under the name `thing` for the correlation to
+    /// resolve; every caller here either selects `FROM thing` or joins it unaliased.
+    public static let dominantVariant = """
+        (SELECT dv.variant FROM field AS dv
+          WHERE dv.thing_id = thing.id AND dv.variant IS NOT NULL
+          GROUP BY dv.variant
+          ORDER BY count(*) DESC, dv.variant ASC
+          LIMIT 1) AS dominant_variant
+        """
+}
+
 /// A Thing with everything the detail screen needs, fetched in one pass.
 public struct ThingDetail: Sendable, Equatable, Identifiable {
     public var thing: Thing
@@ -67,7 +96,7 @@ public struct ThingRepository: Sendable {
         try Thing.fetchAll(
             db,
             sql: """
-            SELECT * FROM thing
+            SELECT thing.*, \(ThingSQL.dominantVariant) FROM thing
             WHERE deleted_at IS NULL AND is_template = 0 AND is_archived = 0
             ORDER BY title COLLATE NOCASE ASC
             LIMIT ?
@@ -80,7 +109,7 @@ public struct ThingRepository: Sendable {
         try Thing.fetchAll(
             db,
             sql: """
-            SELECT * FROM thing
+            SELECT thing.*, \(ThingSQL.dominantVariant) FROM thing
             WHERE deleted_at IS NULL AND is_pinned = 1 AND is_template = 0
             ORDER BY updated_at DESC
             """
@@ -91,7 +120,7 @@ public struct ThingRepository: Sendable {
         try Thing.fetchAll(
             db,
             sql: """
-            SELECT * FROM thing
+            SELECT thing.*, \(ThingSQL.dominantVariant) FROM thing
             WHERE deleted_at IS NULL AND is_template = 0
             ORDER BY COALESCE(viewed_at, updated_at) DESC
             LIMIT ?
@@ -106,7 +135,7 @@ public struct ThingRepository: Sendable {
         try Thing.fetchAll(
             db,
             sql: """
-            SELECT * FROM thing
+            SELECT thing.*, \(ThingSQL.dominantVariant) FROM thing
             WHERE deleted_at IS NULL AND is_template = 0 AND viewed_at IS NULL
             ORDER BY created_at DESC
             LIMIT ?
@@ -120,11 +149,18 @@ public struct ThingRepository: Sendable {
     }
 
     public func trashed(_ db: Database) throws -> [Thing] {
-        try Thing.fetchAll(db, sql: "SELECT * FROM thing WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC")
+        try Thing.fetchAll(db, sql: """
+            SELECT thing.*, \(ThingSQL.dominantVariant) FROM thing
+            WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC
+            """)
     }
 
+    /// Also the search-results path: `SearchService` returns hits, and the caller resolves
+    /// each one through here — so the dominant variant has to be selected on this query too.
     public func find(_ db: Database, id: String) throws -> Thing? {
-        try Thing.fetchOne(db, sql: "SELECT * FROM thing WHERE id = ?", arguments: [id])
+        try Thing.fetchOne(db, sql: """
+            SELECT thing.*, \(ThingSQL.dominantVariant) FROM thing WHERE id = ?
+            """, arguments: [id])
     }
 
     public func detail(_ db: Database, id: String) throws -> ThingDetail? {
@@ -158,7 +194,7 @@ public struct ThingRepository: Sendable {
         let backlinks = try Thing.fetchAll(
             db,
             sql: """
-            SELECT DISTINCT thing.* FROM thing
+            SELECT DISTINCT thing.*, \(ThingSQL.dominantVariant) FROM thing
             JOIN field ON field.thing_id = thing.id
             WHERE field.kind = 'relation' AND field.value_text = ? AND thing.deleted_at IS NULL
             ORDER BY thing.title COLLATE NOCASE
@@ -432,18 +468,21 @@ public struct ThingRepository: Sendable {
         LiveQuery.stream(in: database.queue) { db in
             HomeSnapshot(
                 pinned: try Thing.fetchAll(db, sql: """
-                    SELECT * FROM thing WHERE deleted_at IS NULL AND is_pinned = 1 AND is_template = 0
+                    SELECT thing.*, \(ThingSQL.dominantVariant) FROM thing
+                    WHERE deleted_at IS NULL AND is_pinned = 1 AND is_template = 0
                     ORDER BY updated_at DESC
                     """),
                 recent: try Thing.fetchAll(db, sql: """
-                    SELECT * FROM thing WHERE deleted_at IS NULL AND is_template = 0
+                    SELECT thing.*, \(ThingSQL.dominantVariant) FROM thing
+                    WHERE deleted_at IS NULL AND is_template = 0
                     ORDER BY COALESCE(viewed_at, updated_at) DESC LIMIT \(ThingRepository.recentLimit)
                     """),
                 collections: try ThingCollection.fetchAll(db, sql: """
                     SELECT * FROM collection WHERE parent_id IS NULL ORDER BY sort_order
                     """),
                 suggestions: try Thing.fetchAll(db, sql: """
-                    SELECT * FROM thing WHERE deleted_at IS NULL AND is_template = 0 AND viewed_at IS NULL
+                    SELECT thing.*, \(ThingSQL.dominantVariant) FROM thing
+                    WHERE deleted_at IS NULL AND is_template = 0 AND viewed_at IS NULL
                     ORDER BY created_at DESC LIMIT \(ThingRepository.suggestionLimit)
                     """),
                 totalCount: try Int.fetchOne(db, sql: """
@@ -456,7 +495,7 @@ public struct ThingRepository: Sendable {
     public func observeAll() -> AsyncThrowingStream<[Thing], Error> {
         LiveQuery.stream(in: database.queue) { db in
             try Thing.fetchAll(db, sql: """
-                SELECT * FROM thing
+                SELECT thing.*, \(ThingSQL.dominantVariant) FROM thing
                 WHERE deleted_at IS NULL AND is_template = 0 AND is_archived = 0
                 ORDER BY title COLLATE NOCASE ASC
                 """)
@@ -465,7 +504,10 @@ public struct ThingRepository: Sendable {
 
     public func observeTrash() -> AsyncThrowingStream<[Thing], Error> {
         LiveQuery.stream(in: database.queue) { db in
-            try Thing.fetchAll(db, sql: "SELECT * FROM thing WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC")
+            try Thing.fetchAll(db, sql: """
+                SELECT thing.*, \(ThingSQL.dominantVariant) FROM thing
+                WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC
+                """)
         }
     }
 

@@ -83,6 +83,18 @@ public struct Thing: Identifiable, Hashable, Sendable, FetchableRecord, Persista
     public var deletedAt: String?
     public var versionVector: String
 
+    /// The most common `field.variant` on this Thing — what `icon_json.type = 'auto'`
+    /// resolves its SF Symbol from.
+    ///
+    /// **Not a column on `thing`.** It is a computed column the list queries select as
+    /// `dominant_variant` (see `ThingSQL.dominantVariant`), because resolving an automatic
+    /// icon needs the Thing's fields and the list queries deliberately do not load them.
+    /// Fetching it per row instead would be an N+1.
+    ///
+    /// `nil` on every read that does not select it — a plain `SELECT * FROM thing` — which
+    /// resolves to the generic fallback symbol, exactly as before.
+    public var dominantVariant: String?
+
     public init(id: String,
                 title: String,
                 iconJSON: String? = nil,
@@ -95,7 +107,8 @@ public struct Thing: Identifiable, Hashable, Sendable, FetchableRecord, Persista
                 updatedAt: String,
                 viewedAt: String? = nil,
                 deletedAt: String? = nil,
-                versionVector: String = "{}") {
+                versionVector: String = "{}",
+                dominantVariant: String? = nil) {
         self.id = id
         self.title = title
         self.iconJSON = iconJSON
@@ -109,6 +122,7 @@ public struct Thing: Identifiable, Hashable, Sendable, FetchableRecord, Persista
         self.viewedAt = viewedAt
         self.deletedAt = deletedAt
         self.versionVector = versionVector
+        self.dominantVariant = dominantVariant
     }
 
     public init(row: Row) {
@@ -125,8 +139,13 @@ public struct Thing: Identifiable, Hashable, Sendable, FetchableRecord, Persista
         viewedAt = row["viewed_at"]
         deletedAt = row["deleted_at"]
         versionVector = row["version_vector"]
+        // Optional subscript: GRDB returns nil for a column the statement did not select,
+        // which is what every `SELECT * FROM thing` in this package does.
+        dominantVariant = row["dominant_variant"]
     }
 
+    /// Deliberately omits `dominant_variant` — it is not a column, so writing it back would
+    /// fail the INSERT.
     public func encode(to container: inout PersistenceContainer) {
         container["id"] = id
         container["title"] = title

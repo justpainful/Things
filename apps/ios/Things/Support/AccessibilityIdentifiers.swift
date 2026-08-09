@@ -10,6 +10,8 @@ enum A11y {
         static let things = "tab.things"
         static let collections = "tab.collections"
         static let search = "tab.search"
+        /// The safe-area strip reserved under content for the floating tab bar.
+        static let barClearance = "tab.barClearance"
     }
 
     enum Home {

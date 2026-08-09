@@ -70,7 +70,23 @@ enum Theme {
         static let icon: CGFloat = 34
         static let largeIcon: CGFloat = 56
         static let galleryTile: CGFloat = 108
-        static let pinnedCard: CGFloat = 150
+
+        /// Home's Pinned shelf. Small and Photos-like: a 56pt icon, 16pt padding either
+        /// side, and enough width for a short label. Deliberately *not* a big square — a
+        /// tall card holding one small icon and one word is mostly dead space.
+        static let pinnedCard: CGFloat = 112
+
+        /// Ceiling for the Dynamic-Type-scaled pinned card. At AccessibilityXXL the scaled
+        /// width would otherwise pass the width of the phone; 320pt still fits a ten-letter
+        /// title on one line at that size, which is what keeps words from breaking mid-word.
+        static let pinnedCardMaxWidth: CGFloat = 320
+
+        /// Room to leave under scrolling content for the floating tab bar.
+        ///
+        /// The bar is a lozenge roughly 42pt tall floating above the home indicator, so it
+        /// overlaps the last ~40pt of the content area. Without this the bottom row of every
+        /// scroll view sits permanently under glass: unreadable and unreachable.
+        static let tabBarClearance: CGFloat = 48
     }
 }
 
@@ -121,5 +137,29 @@ extension View {
     /// API built for that rule, so the radius is never hand-computed.
     func thingsConcentricGlass() -> some View {
         glassEffect(.regular.interactive(), in: ThingsShape.container)
+    }
+
+    /// Reserves the strip the floating tab bar sits on, as **safe area** rather than as
+    /// padding.
+    ///
+    /// Applied in exactly one place — once per `Tab` in `MainTabs` — and never per screen.
+    /// That is the whole point: a `NavigationStack` propagates its safe area to every view
+    /// pushed onto it, so Home, All Things, Thing Detail, Collection contents and Search
+    /// results all inherit the same clearance from one call, and no screen can end up
+    /// padded twice.
+    ///
+    /// `safeAreaInset` rather than `.contentMargins`: the latter only reaches scroll views,
+    /// while this has to hold for the empty states and the detail screen's toast as well.
+    /// `safeAreaBar` is for bars we draw ourselves; the tab bar is the system's.
+    func thingsTabBarClearance() -> some View {
+        safeAreaInset(edge: .bottom, spacing: 0) {
+            Color.clear
+                .frame(height: Theme.Size.tabBarClearance)
+                // Nothing is drawn here, so nothing should be touchable here either.
+                .allowsHitTesting(false)
+                // Identified, not hidden: the tour can assert the clearance exists instead
+                // of a reviewer having to measure it off a PNG.
+                .accessibilityIdentifier(A11y.Tab.barClearance)
+        }
     }
 }

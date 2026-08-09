@@ -112,7 +112,10 @@ struct HomeView: View {
                 if !snapshot.pinned.isEmpty {
                     Section("Pinned") {
                         ScrollView(.horizontal) {
-                            HStack(spacing: Theme.Spacing.small) {
+                            // `.top`: cards whose titles wrap to a different number of lines
+                            // must still put their icons — and therefore their labels — on
+                            // the same line, or the shelf reads as two misaligned tiles.
+                            HStack(alignment: .top, spacing: Theme.Spacing.small) {
                                 ForEach(snapshot.pinned) { thing in
                                     NavigationLink(value: thing) {
                                         ThingCardView(thing: thing, registry: model.registry)
@@ -151,7 +154,11 @@ struct HomeView: View {
                         ForEach(snapshot.collections.prefix(5)) { collection in
                             NavigationLink(value: HomeRoute.collection(id: collection.id)) {
                                 Label {
-                                    Text(collection.name).lineLimit(1)
+                                    // Wraps rather than truncates: a one-line cap turns a
+                                    // collection name into "Develop…" at AccessibilityXXL.
+                                    Text(collection.name)
+                                        .lineLimit(2)
+                                        .fixedSize(horizontal: false, vertical: true)
                                 } icon: {
                                     Image(systemName: collection.icon.value ?? "folder")
                                 }

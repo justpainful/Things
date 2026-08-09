@@ -69,7 +69,10 @@ public struct CollectionRepository: Sendable {
             let placeholders = ids.map { _ in "?" }.joined(separator: ", ")
             let things = try Thing.fetchAll(
                 db,
-                sql: "SELECT * FROM thing WHERE id IN (\(placeholders))",
+                sql: """
+                SELECT thing.*, \(ThingSQL.dominantVariant) FROM thing
+                WHERE id IN (\(placeholders))
+                """,
                 arguments: StatementArguments(ids)
             )
             var byID: [String: Thing] = [:]
@@ -79,7 +82,7 @@ public struct CollectionRepository: Sendable {
         return try Thing.fetchAll(
             db,
             sql: """
-            SELECT thing.* FROM thing
+            SELECT thing.*, \(ThingSQL.dominantVariant) FROM thing
             JOIN collection_member ON collection_member.thing_id = thing.id
             WHERE collection_member.collection_id = ? AND thing.deleted_at IS NULL
             ORDER BY collection_member.sort_order
