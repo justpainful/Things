@@ -14,6 +14,13 @@ struct ThingDetailView: View {
     var namespace: Namespace.ID?
 
     @State private var detail: ThingDetail?
+    /// Set once the observation has delivered anything at all — including `nil`.
+    ///
+    /// Without this, "still loading", "this Thing does not exist", and "the query threw"
+    /// are the same picture: a spinner that never stops. The first real screenshot run
+    /// photographed exactly that, and it was undiagnosable from the image.
+    @State private var didReceiveValue = false
+    @State private var loadError: String?
     @State private var revealed: [String: String] = [:]
     @State private var isPresentingAddField = false
     @State private var isPresentingGallery = false
@@ -28,6 +35,16 @@ struct ThingDetailView: View {
                 } else {
                     content(for: detail)
                 }
+            } else if let loadError {
+                EmptyStateView(symbol: "exclamationmark.triangle",
+                               title: "Couldn't open this Thing",
+                               message: loadError)
+                    .accessibilityIdentifier(A11y.Detail.loadFailed)
+            } else if didReceiveValue {
+                EmptyStateView(symbol: "questionmark.square.dashed",
+                               title: "Not found",
+                               message: "This Thing is no longer in your library.")
+                    .accessibilityIdentifier(A11y.Detail.notFound)
             } else {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -239,8 +256,13 @@ struct ThingDetailView: View {
         do {
             for try await value in library.things.observeDetail(id: thingID) {
                 detail = value
+                didReceiveValue = true
             }
         } catch {
+            // Shown ON THIS SCREEN, not only routed to a global alert. A detail screen that
+            // spins forever while the error is announced somewhere else is the same bug.
+            loadError = String(describing: error)
+            didReceiveValue = true
             model.errorMessage = "Could not load this Thing. \(error)"
         }
     }

@@ -34,6 +34,10 @@ enum A11y {
         static let historyButton = "detail.history"
         static let galleryButton = "detail.gallery"
         static let moreButton = "detail.more"
+        // Distinct states, so the tour can tell a failure apart from a slow load instead of
+        // photographing an identical spinner for both.
+        static let loadFailed = "detail.loadFailed"
+        static let notFound = "detail.notFound"
         static func field(_ id: String) -> String { "detail.field.\(id)" }
     }
 

@@ -275,6 +275,29 @@ final class ScreenshotTour: XCTestCase {
     // Every helper returns whether it found what it was looking for. A missing control
     // produces a screenshot of whatever is on screen and a printed note, never an abort.
 
+    /// `isHittable` is NOT safe to read on an arbitrary element.
+    ///
+    /// When an element's frame is degenerate, XCUITest cannot compute an activation point and
+    /// **records a test failure** rather than returning `false`:
+    ///
+    ///     Failed to determine hittability of "search.chip.accounts" Button:
+    ///     Activation point invalid and no suggested hit points based on element frame
+    ///
+    /// That is what killed the first real tour: one off-screen chip aborted the run at
+    /// screenshot 14 of 88, taking every dark-mode and every XXL pass with it. Guarding with
+    /// `if !element.isHittable` does not help, because the crash is in *reading the property*.
+    ///
+    /// So: check the geometry ourselves first, and only ask XCUITest about hittability once we
+    /// know the frame is real and on screen.
+    private func canTouch(_ element: XCUIElement) -> Bool {
+        guard element.exists else { return false }
+        let frame = element.frame
+        guard frame.width > 1, frame.height > 1 else { return false }
+        let window = app.windows.firstMatch.frame
+        guard window.width > 0, window.intersects(frame) else { return false }
+        return element.isHittable
+    }
+
     @discardableResult
     private func tap(identifier: String) -> Bool {
         let element = app.descendants(matching: .any).matching(identifier: identifier).firstMatch
@@ -288,11 +311,11 @@ final class ScreenshotTour: XCTestCase {
         // the screenshot, which is the failure mode that leaves a green build with a hole
         // in the middle of the tour.
         var attempts = 0
-        while !element.isHittable && attempts < 5 {
+        while !canTouch(element) && attempts < 5 {
             app.swipeUp()
             attempts += 1
         }
-        guard element.isHittable else {
+        guard canTouch(element) else {
             print("[tour] identifier '\(identifier)' never became hittable")
             return false
         }
@@ -346,7 +369,7 @@ final class ScreenshotTour: XCTestCase {
         }
         let row = app.descendants(matching: .any).matching(identifier: "search.chips").firstMatch
         var attempts = 0
-        while !element.isHittable && attempts < 8 {
+        while !canTouch(element) && attempts < 8 {
             if row.exists {
                 row.swipeLeft()
             } else if app.scrollViews.firstMatch.exists {
@@ -356,7 +379,7 @@ final class ScreenshotTour: XCTestCase {
             }
             attempts += 1
         }
-        guard element.isHittable else {
+        guard canTouch(element) else {
             print("[tour] chip '\(id)' never became hittable")
             return false
         }
