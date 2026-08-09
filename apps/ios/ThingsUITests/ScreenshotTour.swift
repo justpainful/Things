@@ -257,10 +257,6 @@ final class ScreenshotTour: XCTestCase {
                 snap(21, "conflicts-two-versions", mode)
                 back()
             }
-            if tap(identifier: "settings.sync") {
-                snap(22, "sync-pairing", mode)
-                back()
-            }
             if tap(identifier: "settings.diagnostics") {
                 snap(23, "diagnostics", mode)
                 tapFirst(label: "Done")

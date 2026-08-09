@@ -23,8 +23,6 @@ struct RouteDestination: View {
             HistoryView(thingID: thingID)
         case .conflicts:
             ConflictView()
-        case .sync:
-            SyncPairingView()
         case .collection(let id):
             CollectionDetailView(collectionID: id)
         }
@@ -37,7 +35,6 @@ enum HomeRoute: Hashable {
     case trash
     case history(thingID: String?)
     case conflicts
-    case sync
     case collection(id: String)
 }
 

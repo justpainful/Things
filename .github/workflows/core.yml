@@ -14,38 +14,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: '24'
-          cache: npm
-
-      - run: npm ci
-
-      - name: Typecheck
-        run: npm run build
-
-      - name: Test core + server
-        run: npm test
-
-      - name: Build web client
-        run: npm run build --workspace apps/web
-
-      # The vectors are the ONLY thing keeping the two independently-written cores compatible.
-      # This guard exists because that net already failed once: a runner matched files by a
-      # top-level `cases` array, two files lacked one, and they were silently skipped — green
-      # suite, byte-incompatible cores. Every vector must now declare who runs it and how many
-      # cases it holds, so an unrecognised file fails loudly instead of disappearing.
-      - name: Conformance vectors are declared and accounted for
-        run: node tools/spec/check-vectors.mjs
-
-  # This repo is PUBLIC and the app stores passwords. A committed database or key is a
-  # permanent public disclosure, so this gate is not optional. docs/02-SECURITY.md §8.
+  # main is the phone-only build: no server, no web client, no npm workspace.
+  # Everything that used to run here lives on the `server-web` branch.
+  # What survives is the part that protects a PUBLIC repository holding a
+  # password manager: nothing real may ever be committed.
   secrets:
     runs-on: ubuntu-latest
     timeout-minutes: 10

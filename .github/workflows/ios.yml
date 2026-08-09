@@ -232,39 +232,3 @@ jobs:
   # Tier 1 review runs on Ubuntu, in parallel with nothing and costing no macOS minutes.
   # It used to run on the macOS runner and needed `npm ci` over the whole workspace to do it,
   # which is a lot of wall clock spent installing a web client in order to diff PNGs.
-  review:
-    needs: build-test-shoot
-    if: always()
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/download-artifact@v8
-        with:
-          name: screenshots
-          path: artifacts/screenshots
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: '24'
-
-      # Only the two pure-JS libraries the differ needs — not the workspace.
-      - name: Diff against baselines
-        continue-on-error: true
-        run: |
-          npm install --no-save --no-audit --no-fund pixelmatch pngjs
-          node tools/shots/diff.mjs || true
-          if [ -f screenshots/diff/summary.md ]; then
-            cat screenshots/diff/summary.md >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-      # Just the screens that moved, plus pixel-diff overlays. Open this first; the full set
-      # is only needed when the diff points somewhere surprising.
-      - uses: actions/upload-artifact@v7
-        with:
-          name: screenshots-changed
-          path: screenshots/diff/
-          retention-days: 14
-          compression-level: 0
-          if-no-files-found: ignore   # an empty diff means nothing moved. That is success.

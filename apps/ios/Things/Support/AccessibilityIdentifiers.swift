@@ -75,7 +75,6 @@ enum A11y {
         static let lockNow = "settings.lockNow"
         static let trash = "settings.trash"
         static let history = "settings.history"
-        static let sync = "settings.sync"
         static let conflicts = "settings.conflicts"
         static let diagnostics = "settings.diagnostics"
     }
@@ -93,7 +92,7 @@ enum A11y {
     }
 
     enum Sync {
-        static let root = "sync.root"
+        static let root = "sync.root.removed"
     }
 
     enum Gallery {

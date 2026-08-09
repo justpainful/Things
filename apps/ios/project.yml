@@ -110,13 +110,11 @@ targets:
         NSFaceIDUsageDescription: >-
           Things uses Face ID to unlock your library on this iPhone. Your PIN always works
           as well.
-        # Sync is LAN-only, peer to peer, and only ever talks to a device you have paired.
-        NSLocalNetworkUsageDescription: >-
-          Things syncs directly with your own computer over your local network. Nothing is
-          sent to the internet.
-        NSBonjourServices:
-          - _things-sync._tcp
-          - _things-sync._udp
+        # No NSLocalNetworkUsageDescription and no NSBonjourServices, deliberately.
+        # Things is entirely on-device: it opens no port, runs no server, discovers nothing,
+        # and makes no outbound request. Declaring local-network intent it does not use would
+        # be a permission prompt for a capability that does not exist, and a claim in the
+        # binary that the code does not back.
         # Import and export happen in the app — there are no extensions — so the Files app
         # needs to be able to hand documents over.
         UIFileSharingEnabled: true

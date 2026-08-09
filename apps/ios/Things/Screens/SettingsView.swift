@@ -67,15 +67,6 @@ struct SettingsView: View {
                 .accessibilityIdentifier(A11y.Settings.conflicts)
             }
 
-            Section {
-                NavigationLink(value: HomeRoute.sync) {
-                    Label("Sync with a Computer", systemImage: "laptopcomputer.and.iphone")
-                }
-                .accessibilityIdentifier(A11y.Settings.sync)
-            } footer: {
-                Text("Things syncs directly with your own computer over your local network. Nothing is sent to the internet, and there is no account.")
-            }
-
             Section("About") {
                 LabeledContent("Version", value: ThingsCoreInfo.version)
                 LabeledContent("Device", value: DeviceInfo.name)
