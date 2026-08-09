@@ -26,6 +26,20 @@ packages:
   ThingsCore:
     path: ../../packages/core-swift
 
+  # GRDB has to be linked by the APP, not just by ThingsCore.
+  #
+  # No file in `Things/` writes `import GRDB` — but `SeedData` and `HistoryView` call GRDB
+  # extension methods on ThingsCore types (`Change.fetchAll(db, sql:)`, `StatementArguments`,
+  # `db.execute(sql:arguments:)`). Member lookup reaches transitively-imported modules, so
+  # that COMPILES fine; it just fails at link time with a page of undefined GRDB symbols,
+  # because a package dependency is not transitive for linking.
+  #
+  # Same URL and same exact version as ThingsCore's own dependency, so SwiftPM resolves one
+  # copy by identity rather than two.
+  GRDB:
+    url: https://github.com/sqlcipher/GRDB.swift
+    exactVersion: 7.11.1
+
 settings:
   base:
     SWIFT_VERSION: "5.0"
@@ -57,6 +71,8 @@ targets:
     dependencies:
       - package: ThingsCore
         product: ThingsCore
+      - package: GRDB
+        product: GRDB
     settings:
       base:
         # Stable, forever. The keychain access group is `<TeamID>.<bundleID>` — a bundle id
