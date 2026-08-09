@@ -53,8 +53,12 @@ struct HistoryView: View {
 
     private func restore(_ entry: HistoryEntry) {
         model.perform("Restore") { library in
+            // `_ =` is load-bearing. `restore` returns the new Change, and a single-expression
+            // closure infers its return type from that — so the closure becomes
+            // `(Database) -> Change` while `perform` requires `-> Void`, and the generic
+            // parameter conflicts. Discarding makes the closure Void.
             try library.write { db in
-                try library.oplog.restore(db, changeID: entry.id)
+                _ = try library.oplog.restore(db, changeID: entry.id)
             }
         }
         load()
