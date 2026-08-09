@@ -41,12 +41,30 @@ enum A11y {
         static let loadFailed = "detail.loadFailed"
         static let notFound = "detail.notFound"
         static func field(_ id: String) -> String { "detail.field.\(id)" }
+
+        // Editing. The tour photographs a focused field, so every control that appears
+        // only while editing needs a name of its own.
+        static let renameButton = "detail.rename"
+        static let renameTextField = "detail.renameField"
+        static let reorderButton = "detail.reorder"
+        /// The keyboard accessory that ends editing.
+        static let doneEditing = "detail.doneEditing"
+        /// The control that carries a field's value while it is being edited — a text
+        /// field, a date picker, a colour well or the relation button, depending on kind.
+        static func fieldEditor(_ id: String) -> String { "detail.fieldEditor.\(id)" }
+        static func fieldDone(_ id: String) -> String { "detail.fieldDone.\(id)" }
+        static func fieldExpand(_ id: String) -> String { "detail.fieldExpand.\(id)" }
+        static func fieldReveal(_ id: String) -> String { "detail.fieldReveal.\(id)" }
+        static func fieldToggle(_ id: String) -> String { "detail.fieldToggle.\(id)" }
+        static func fieldDelete(_ id: String) -> String { "detail.fieldDelete.\(id)" }
     }
 
     enum Sheets {
         static let addField = "sheet.addField"
         static let newThing = "sheet.newThing"
         static let fieldActions = "sheet.fieldActions"
+        static let noteEditor = "sheet.noteEditor"
+        static let relationPicker = "sheet.relationPicker"
     }
 
     enum Search {

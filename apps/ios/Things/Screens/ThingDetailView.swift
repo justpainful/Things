@@ -2,10 +2,27 @@ import SwiftUI
 import UIKit
 import ThingsCore
 
-/// A Thing: sections, fields, media, relations.
+/// A Thing: sections, fields, media, relations — and the one screen where all of it can
+/// actually be *changed*.
 ///
 /// The body is content, so nothing here is glass. The glass on this screen is the
 /// navigation bar's, which the system provides, plus the context-menu previews.
+///
+/// ## Editing
+///
+/// Editing is **inline**, in the row, not behind a per-field sheet. A sheet was the
+/// standing fallback if inline editing fought the `List`; it did not, because the two
+/// things that usually cause that fight are avoided outright:
+///
+///  * **One draft, owned here.** `editingFieldID` and `draft` live on this screen rather
+///    than in each row, so the live query refreshing mid-edit cannot discard what was
+///    typed, and two rows can never both think they are being edited.
+///  * **Commits carry the field id.** A row being torn down calls back with its own id;
+///    if the screen has already moved on, the commit is dropped instead of writing one
+///    field's text into another.
+///
+/// Every write goes through `AppModel.perform` → `library.write` → a repository, so each
+/// one lands in the oplog and History, Undo and Restore keep working.
 struct ThingDetailView: View {
 
     @Environment(AppModel.self) private var model
@@ -26,6 +43,30 @@ struct ThingDetailView: View {
     @State private var isPresentingGallery = false
     @State private var copyFeedback = 0
     @State private var toast: String?
+
+    // MARK: Editing state
+    //
+    // Deliberately one of each: only one field is editable at a time, which is what makes
+    // "commit the previous one, then open the next" a two-line operation instead of a
+    // reconciliation problem.
+
+    @State private var editingFieldID: String?
+    @State private var draft = ""
+    /// Which field `draft` belongs to. Deliberately outlives `editingFieldID`: tapping
+    /// Expand may blur the inline field first, and without this the full-height editor
+    /// would open on the row's last *saved* text and quietly drop the unsaved edit.
+    @State private var draftFieldID: String?
+    /// Separate from `draft` so the full-height editor keeps its text even though opening
+    /// it blurs — and therefore commits and clears — the inline field it came from.
+    @State private var noteDraft = ""
+    @State private var noteEditorField: Field?
+    @State private var relationField: Field?
+    @State private var isPresentingRename = false
+    @State private var titleDraft = ""
+    @State private var editMode: EditMode = .inactive
+    /// Titles of every Thing, for resolving a forward `relation`. `detail.backlinks` holds
+    /// the things pointing *at* this one, which is the opposite direction.
+    @State private var thingTitles: [String: String] = [:]
 
     var body: some View {
         Group {
@@ -55,13 +96,37 @@ struct ThingDetailView: View {
         .sheet(isPresented: $isPresentingAddField) {
             AddFieldSheet(thingID: thingID)
         }
+        .sheet(item: $noteEditorField) { field in
+            NoteEditorSheet(title: field.label,
+                            initialText: noteDraft,
+                            isMonospaced: field.kind == .code) { text in
+                write(field, text)
+            }
+        }
+        .sheet(item: $relationField) { field in
+            RelationPickerSheet(excluding: thingID,
+                                currentTargetID: field.valueText) { targetID in
+                writeText(field, targetID)
+            }
+        }
+        .alert("Rename", isPresented: $isPresentingRename) {
+            TextField("Name", text: $titleDraft)
+                .accessibilityIdentifier(A11y.Detail.renameTextField)
+            Button("Cancel", role: .cancel) { }
+            Button("Rename") { commitRename() }
+        } message: {
+            Text("Give this Thing a new name.")
+        }
         .navigationDestination(isPresented: $isPresentingGallery) {
             MediaGalleryView(thingID: thingID)
         }
         .overlay(alignment: .bottom) { toastView }
         .sensoryFeedback(.success, trigger: copyFeedback)
         .accessibilityIdentifier(A11y.Detail.root)
-        .task { await observe() }
+        .task {
+            loadThingTitles()
+            await observe()
+        }
         .applyZoomTransition(id: thingID, namespace: namespace)
     }
 
@@ -85,6 +150,7 @@ struct ThingDetailView: View {
                     } label: {
                         Label("\(galleryFields.count) items", systemImage: "photo.on.rectangle")
                     }
+                    .frame(minHeight: 44)
                     .accessibilityIdentifier(A11y.Detail.galleryButton)
                 }
             }
@@ -95,6 +161,9 @@ struct ThingDetailView: View {
                 Section {
                     ForEach(defaultFields) { field in
                         fieldRow(field, detail: detail)
+                    }
+                    .onMove { indices, destination in
+                        moveFields(defaultFields, sectionID: nil, from: indices, to: destination)
                     }
                 }
             }
@@ -107,6 +176,9 @@ struct ThingDetailView: View {
                     } else {
                         ForEach(fields) { field in
                             fieldRow(field, detail: detail)
+                        }
+                        .onMove { indices, destination in
+                            moveFields(fields, sectionID: section.id, from: indices, to: destination)
                         }
                     }
                 }
@@ -132,6 +204,7 @@ struct ThingDetailView: View {
                 NavigationLink(value: HomeRoute.history(thingID: detail.thing.id)) {
                     Label("History", systemImage: "clock.arrow.circlepath")
                 }
+                .frame(minHeight: 44)
                 .accessibilityIdentifier(A11y.Detail.historyButton)
             }
 
@@ -142,6 +215,10 @@ struct ThingDetailView: View {
             }
         }
         .listStyle(.insetGrouped)
+        // Drag the list to put the keyboard away. The blur commits, so a swipe down is a
+        // save rather than a discard.
+        .scrollDismissesKeyboard(.interactively)
+        .environment(\.editMode, $editMode)
     }
 
     @ViewBuilder
@@ -153,14 +230,33 @@ struct ThingDetailView: View {
                 registry: registry,
                 privacyMode: model.privacyMode,
                 revealedValue: revealed[field.id],
-                onReveal: { toggleReveal(field) }
+                onReveal: { toggleReveal(field) },
+                relationTitle: relationTitle(for: field),
+                nowMilliseconds: model.displayNowMilliseconds,
+                isEditing: editingFieldID == field.id,
+                draft: $draft,
+                onBeginEditing: { beginEditing(field) },
+                onCommit: { commitEdit($0) },
+                onWriteText: { writeText(field, $0) },
+                onPickRelation: { openRelationPicker(field) },
+                onExpandEditor: { openNoteEditor(field) }
             )
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                Button(role: .destructive) {
+                    deleteField(field)
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+                .accessibilityIdentifier(A11y.Detail.fieldDelete(field.id))
+            }
             .contextMenu {
                 FieldQuickActions(field: field,
                                   detail: detail,
                                   registry: registry,
                                   onCopy: { copy($0) },
                                   onReveal: { toggleReveal(field) },
+                                  onEdit: { beginEditing(field) },
+                                  onExpand: { openNoteEditor(field) },
                                   onDelete: { deleteField(field) })
             }
         }
@@ -191,6 +287,25 @@ struct ThingDetailView: View {
     private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
             Menu {
+                Button {
+                    titleDraft = detail?.thing.title ?? ""
+                    isPresentingRename = true
+                } label: {
+                    Label("Rename", systemImage: "pencil")
+                }
+                .accessibilityIdentifier(A11y.Detail.renameButton)
+
+                Button {
+                    commitEdit()
+                    editMode = editMode == .active ? .inactive : .active
+                } label: {
+                    Label(editMode == .active ? "Done Reordering" : "Reorder Fields",
+                          systemImage: "arrow.up.arrow.down")
+                }
+                .accessibilityIdentifier(A11y.Detail.reorderButton)
+
+                Divider()
+
                 if let detail {
                     ThingQuickActions(thing: detail.thing)
                 }
@@ -210,6 +325,161 @@ struct ThingDetailView: View {
             .accessibilityIdentifier(A11y.Detail.addFieldButton)
             .accessibilityLabel("Add Field")
         }
+        // The numeric and decimal keyboards have no return key, so without this there is
+        // no way to finish editing a Port or an Amount except by tapping something else.
+        ToolbarItemGroup(placement: .keyboard) {
+            Spacer()
+            Button("Done") { commitEdit() }
+                .accessibilityIdentifier(A11y.Detail.doneEditing)
+        }
+    }
+
+    // MARK: - Editing
+
+    private func beginEditing(_ field: Field) {
+        guard editingFieldID != field.id else { return }
+        if let open = editingFieldID {
+            commitEdit(open)
+        }
+        draft = plainText(of: field)
+        draftFieldID = field.id
+        editingFieldID = field.id
+    }
+
+    /// Writes the draft back to the field that is currently open.
+    ///
+    /// - Parameter expected: the id the *caller* believes it is committing. A row that has
+    ///   already been replaced still gets one last callback as its editor is torn down;
+    ///   without this check that callback would write the outgoing row's draft into the
+    ///   incoming row's field.
+    private func commitEdit(_ expected: String? = nil) {
+        guard let open = editingFieldID else { return }
+        if let expected, expected != open { return }
+        editingFieldID = nil
+        let value = draft
+        guard let field = detail?.fields.first(where: { $0.id == open }) else { return }
+        // Never leave a plaintext secret sitting in view state longer than the edit itself.
+        if field.isSecret || field.kind == .secret {
+            draft = ""
+            draftFieldID = nil
+        }
+        write(field, value)
+    }
+
+    /// The single write path for a text-carrying field.
+    private func write(_ field: Field, _ value: String) {
+        if field.isSecret || field.kind == .secret {
+            // An empty box is "I changed my mind", not "erase my password". Clearing a
+            // secret is Delete Field, which is explicit and undoable.
+            guard !value.isEmpty else { return }
+            model.perform("Save") { library in
+                try library.write { db in
+                    try library.fields.setSecret(db, fieldID: field.id,
+                                                 plaintext: value, dek: library.dek)
+                }
+            }
+            // Re-hide: the value on screen is no longer the one that was revealed.
+            revealed[field.id] = nil
+            return
+        }
+
+        if field.kind == .richText {
+            guard value != plainText(of: field) else { return }
+            let json: String? = value.isEmpty ? nil : RichTextValue.json(fromPlainText: value)
+            model.perform("Save") { library in
+                try library.write { db in
+                    // Both carriers in one patch: the schema allows at most one to be
+                    // non-null, so writing value_json without clearing value_text would be
+                    // a CHECK violation on any field that ever held plain text.
+                    try library.fields.patchField(db, fieldID: field.id, patch: [
+                        "value_json": json.map { JSONValue.string($0) } ?? .null,
+                        "value_text": .null
+                    ])
+                }
+            }
+            return
+        }
+
+        let stored: String? = value.isEmpty ? nil : value
+        guard stored != field.valueText else { return }
+        writeText(field, stored)
+    }
+
+    /// Immediate write for the controls that are their own editor — Toggle, DatePicker,
+    /// ColorPicker, the relation picker — and the tail of `write`.
+    private func writeText(_ field: Field, _ value: String?) {
+        // Belt and braces. `value_text` is cleartext and the schema's second CHECK would
+        // reject the row anyway; dropping the write is better than attempting it. Nothing
+        // reaches here for a secret today — secrets are neither toggles nor dates — and
+        // this is what keeps that true if a kind ever changes.
+        guard !field.isSecret, field.kind != .secret else { return }
+        model.perform("Save") { library in
+            try library.write { db in
+                try library.fields.patchField(db, fieldID: field.id, patch: [
+                    "value_text": value.map { JSONValue.string($0) } ?? .null,
+                    "value_json": .null
+                ])
+            }
+        }
+    }
+
+    private func plainText(of field: Field) -> String {
+        if field.isSecret || field.kind == .secret {
+            return revealed[field.id] ?? ""
+        }
+        if field.kind == .richText, let json = field.valueJSON {
+            return RichTextValue.plainText(fromJSON: json)
+        }
+        return field.valueText ?? ""
+    }
+
+    private func openNoteEditor(_ field: Field) {
+        noteDraft = draftFieldID == field.id ? draft : plainText(of: field)
+        commitEdit()
+        noteEditorField = field
+    }
+
+    private func openRelationPicker(_ field: Field) {
+        commitEdit()
+        relationField = field
+    }
+
+    private func commitRename() {
+        let name = titleDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, name != detail?.thing.title else { return }
+        model.perform("Rename") { library in
+            try library.write { db in
+                try library.things.rename(db, id: thingID, title: name)
+            }
+        }
+    }
+
+    /// Fractional reorder: the moved field gets an order between its two new neighbours,
+    /// so one row changes rather than every row in the section.
+    private func moveFields(_ fields: [Field],
+                            sectionID: String?,
+                            from source: IndexSet,
+                            to destination: Int) {
+        guard let sourceIndex = source.first, fields.indices.contains(sourceIndex) else { return }
+        let moved = fields[sourceIndex]
+        var reordered = fields
+        reordered.move(fromOffsets: source, toOffset: destination)
+        guard let landing = reordered.firstIndex(where: { $0.id == moved.id }) else { return }
+        let after: Field? = landing > 0 ? reordered[landing - 1] : nil
+        let before: Field? = landing + 1 < reordered.count ? reordered[landing + 1] : nil
+        model.perform("Reorder fields") { library in
+            try library.write { db in
+                try library.fields.move(db, fieldID: moved.id,
+                                        toSection: sectionID, after: after, before: before)
+            }
+        }
+    }
+
+    private func relationTitle(for field: Field) -> String? {
+        guard field.kind == .relation,
+              let targetID = field.valueText,
+              !targetID.isEmpty else { return nil }
+        return thingTitles[targetID]
     }
 
     // MARK: - Actions
@@ -239,11 +509,24 @@ struct ThingDetailView: View {
     }
 
     private func deleteField(_ field: Field) {
+        if editingFieldID == field.id { editingFieldID = nil }
+        if draftFieldID == field.id {
+            draft = ""
+            draftFieldID = nil
+        }
         model.perform("Delete field") { library in
             try library.write { db in
                 try library.fields.deleteField(db, fieldID: field.id)
             }
         }
+    }
+
+    private func loadThingTitles() {
+        guard let library = model.library else { return }
+        let things = (try? library.read { db in try library.things.all(db) }) ?? []
+        var titles: [String: String] = [:]
+        for thing in things { titles[thing.id] = thing.title }
+        thingTitles = titles
     }
 
     private func observe() async {
@@ -303,7 +586,8 @@ struct ChipsRow: View {
 /// Per-variant quick actions, driven entirely by `field-kinds.json`.
 ///
 /// Nothing here knows what a "password" is: the action list, its labels and whether it is
-/// gated all come from the registry.
+/// gated all come from the registry. Edit and Open Editor are the exceptions, and they are
+/// keyed off the *kind*'s storage rather than off any particular variant.
 struct FieldQuickActions: View {
 
     let field: Field
@@ -311,11 +595,25 @@ struct FieldQuickActions: View {
     let registry: FieldKindRegistry
     let onCopy: (String) -> Void
     let onReveal: () -> Void
+    let onEdit: () -> Void
+    let onExpand: () -> Void
     let onDelete: () -> Void
 
     var body: some View {
         let variant = registry.variant(field.variant)
         let actions = variant.map { registry.actions(for: $0) } ?? []
+
+        if isEditable {
+            Button(action: onEdit) {
+                Label("Edit", systemImage: "pencil")
+            }
+        }
+
+        if isMultiline {
+            Button(action: onExpand) {
+                Label("Open Editor", systemImage: "arrow.up.left.and.arrow.down.right")
+            }
+        }
 
         ForEach(actions) { action in
             Button {
@@ -329,6 +627,20 @@ struct FieldQuickActions: View {
 
         Button(role: .destructive, action: onDelete) {
             Label("Delete Field", systemImage: "trash")
+        }
+    }
+
+    private var isEditable: Bool {
+        switch field.kind {
+        case .text, .longText, .richText, .number, .url, .code, .secret: return true
+        default: return false
+        }
+    }
+
+    private var isMultiline: Bool {
+        switch field.kind {
+        case .longText, .richText, .code: return true
+        default: return false
         }
     }
 
