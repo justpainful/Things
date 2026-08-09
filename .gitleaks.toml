@@ -1,0 +1,56 @@
+title = "Things — secret scanning"
+
+[extend]
+useDefault = true
+
+# This repository IS a password manager, so its source is unavoidably dense with the words
+# key, secret, token, cipher, and vault. The default `generic-api-key` rule scores on entropy
+# and cannot distinguish `let privateKey: P256.KeyAgreement.PrivateKey` — a type annotation
+# with no value at all — from a pasted credential.
+#
+# The allowlists below are deliberately scoped to IDENTIFIER SHAPES, never to files or
+# directories. Exempting packages/core-swift/Sources/ThingsCore/Crypto/ would be the easy fix
+# and the wrong one: that directory is precisely where a real key is most likely to be pasted
+# by accident, and silencing it defeats the reason this scan exists.
+
+[[allowlists]]
+description = "Swift and TypeScript type annotations carry no value"
+regexTarget = "line"
+regexes = [
+  # let privateKey: P256.KeyAgreement.PrivateKey
+  '''^\s*(let|var|private\s+let|private\s+var)\s+\w+\s*:\s*[A-Z][A-Za-z0-9_.]*(<[^>]*>)?\??\s*$''',
+  # func f(key: SymmetricKey) -> SealedBox     /  case secret(SymmetricKey)
+  '''^\s*(func|case|init)\b.*[:(]\s*[A-Z][A-Za-z0-9_.]*\s*[,)\]]''',
+  # readonly key: CryptoKey;  /  key: SymmetricKey,
+  '''^\s*(readonly\s+)?\w+\s*:\s*(CryptoKey|SymmetricKey|KeyObject|Buffer|Uint8Array|Data)\b''',
+]
+
+[[allowlists]]
+description = "CryptoKit / Node crypto type and context identifiers, not credentials"
+regexTarget = "match"
+regexes = [
+  '''^P256\.[A-Za-z.]+$''',
+  '''^SymmetricKey$''',
+  '''^SecureEnclave\.[A-Za-z.]+$''',
+  '''^kSecAttr[A-Za-z]+$''',
+  '''^kSecClass[A-Za-z]+$''',
+  # Key-derivation context strings are public by design; they are domain separators, not
+  # secrets, and they are published verbatim in spec/crypto.md.
+  '''^things:[a-z0-9:-]+$''',
+]
+
+[[allowlists]]
+description = "Conformance vectors contain FIXED, PUBLISHED test keys — that is their purpose"
+paths = [
+  '''spec/vectors/.*\.json$''',
+]
+# Narrow on purpose: only the vectors, which must contain deterministic key material to be
+# testable at all, and which are documented as non-secret in spec/crypto.md.
+
+[[allowlists]]
+description = "Documentation showing envelope layouts and example hex"
+paths = [
+  '''spec/crypto\.md$''',
+  '''spec/oplog\.md$''',
+  '''docs/02-SECURITY\.md$''',
+]
