@@ -1,0 +1,38 @@
+Copyright (c) 2026 Faisal Saud. All rights reserved.
+
+PROPRIETARY — SOURCE-AVAILABLE, NOT OPEN SOURCE.
+
+This repository is published so that it can be read. Publishing it grants no
+license of any kind. No permission to use this software is given by the mere
+fact that this repository is public.
+
+YOU MAY:
+  - View, read, and study this source code.
+  - Fork this repository on GitHub solely as a means of reading it.
+  - Quote short excerpts for commentary, review, or teaching, with attribution.
+
+YOU MAY NOT, without prior written permission from the copyright holder:
+  - Use this software, in whole or in part, for any purpose, personal or
+    commercial.
+  - Copy, reproduce, modify, adapt, translate, or create derivative works.
+  - Build, compile, install, deploy, run, or distribute it, or any binary or
+    artifact produced from it.
+  - Publish, sublicense, sell, rent, lease, host, or otherwise transfer it.
+  - Reuse its design, structure, interface, or assets in another product.
+  - Use it, or anything derived from it, to train, fine-tune, benchmark, or
+    evaluate any machine learning model, dataset, or AI system.
+  - Remove, obscure, or alter this notice.
+
+Permission may be granted, and is granted only in writing. Requests:
+https://github.com/justpainful
+
+Any use not expressly permitted above is prohibited and constitutes copyright
+infringement. These terms apply to every version of this repository, including
+past commits, tags, releases, and forks.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
