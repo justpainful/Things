@@ -1,56 +1,64 @@
 {
   "$comment": "Version vector comparison. A missing device counts as zero. `dominates` means A saw B; `concurrent` is the only case that produces a conflict.",
+  "$swiftCoverage": "The `cases` array is run by core-swift: comparison entries hit checkVersionVector (which reads `result`), canonicalJson entries hit checkCanonicalJSON (which reads `value` + `canonicalJson`). RESHAPED — the comparison cases used to live under a `comparisons` key with an `expect` field, which no Swift runner reads, so the whole file was silently skipped. No expected VALUE changed; only the spelling the Swift dispatcher needs to find them. `merges` below remains ts-only: core-swift has no merge runner.",
   "version": 1,
-  "comparisons": [
+  "cases": [
     {
+      "kind": "comparison",
       "a": {},
       "b": {},
-      "expect": "equal"
+      "result": "equal"
     },
     {
+      "kind": "comparison",
       "a": {
         "a": 1
       },
       "b": {
         "a": 1
       },
-      "expect": "equal"
+      "result": "equal"
     },
     {
+      "kind": "comparison",
       "a": {
         "a": 2
       },
       "b": {
         "a": 1
       },
-      "expect": "dominates"
+      "result": "dominates"
     },
     {
+      "kind": "comparison",
       "a": {
         "a": 1
       },
       "b": {
         "a": 2
       },
-      "expect": "dominated"
+      "result": "dominated"
     },
     {
+      "kind": "comparison",
       "a": {
         "a": 1
       },
       "b": {},
-      "expect": "dominates"
+      "result": "dominates"
     },
     {
+      "kind": "comparison",
       "a": {
         "a": 1
       },
       "b": {
         "b": 1
       },
-      "expect": "concurrent"
+      "result": "concurrent"
     },
     {
+      "kind": "comparison",
       "a": {
         "a": 2,
         "b": 1
@@ -59,9 +67,10 @@
         "a": 1,
         "b": 2
       },
-      "expect": "concurrent"
+      "result": "concurrent"
     },
     {
+      "kind": "comparison",
       "a": {
         "a": 2,
         "b": 2
@@ -70,9 +79,10 @@
         "a": 1,
         "b": 2
       },
-      "expect": "dominates"
+      "result": "dominates"
     },
     {
+      "kind": "comparison",
       "a": {
         "a": 1,
         "b": 1,
@@ -82,7 +92,20 @@
         "a": 1,
         "b": 1
       },
-      "expect": "dominates"
+      "result": "dominates"
+    },
+    {
+      "kind": "canonicalJson",
+      "value": {
+        "b": 1,
+        "a": 2
+      },
+      "canonicalJson": "{\"a\":2,\"b\":1}"
+    },
+    {
+      "kind": "canonicalJson",
+      "value": {},
+      "canonicalJson": "{}"
     }
   ],
   "merges": [
@@ -190,17 +213,9 @@
       }
     }
   ],
-  "canonicalJson": [
-    {
-      "vector": {
-        "b": 1,
-        "a": 2
-      },
-      "expect": "{\"a\":2,\"b\":1}"
-    },
-    {
-      "vector": {},
-      "expect": "{}"
-    }
-  ]
+  "mustRun": [
+    "ts",
+    "swift"
+  ],
+  "caseCount": 11
 }

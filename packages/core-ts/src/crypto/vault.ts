@@ -80,7 +80,11 @@ export class FileVault implements KeyringStore {
 
   write(contents: VaultContents): void {
     mkdirSync(dirname(this.path), { recursive: true });
-    const body = `${canonicalJson(contents)}\n`;
+    // No trailing newline: `core-swift`'s FileVaultStorage writes
+    // `canonicalJSON` and nothing else, and this file is one both cores
+    // rewrite. Byte-identical output means a `vault.json` touched by the phone
+    // and then by the PC produces no spurious diff.
+    const body = canonicalJson(contents);
     const temp = `${this.path}.tmp`;
     writeFileSync(temp, body, { encoding: 'utf8', mode: 0o600 });
     try {

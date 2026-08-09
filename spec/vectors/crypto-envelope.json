@@ -1,5 +1,6 @@
 {
   "$comment": "AES-256-GCM envelope, scrypt KDF, and framed object encryption. Every nonce and salt here is FIXED so the outputs are deterministic — production always uses random ones.",
+  "$swiftCoverage": "Fully run by ConformanceVectorTests.testCryptoEnvelopeVectors — a named runner that knows this file’s shape and fails loudly.",
   "version": 1,
   "envelopeLayout": {
     "magic": "TENV",
@@ -39,6 +40,42 @@
       "aadHex": "",
       "plaintextUtf8": "",
       "expectHex": "54454e5601010c000102030405060708090a0b01d247fe1deb3f9d140ef63987d8a8e4"
+    },
+    {
+      "wraps": "dek_wrap_pin",
+      "contextUtf8": "things:dek-wrap:pin:v1",
+      "keyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "nonceHex": "000102030405060708090a0b",
+      "aadHex": "7468696e67733a64656b2d777261703a70696e3a7631",
+      "plaintextUtf8": "0123456789abcdef0123456789abcdef",
+      "expectHex": "54454e5601010c000102030405060708090a0b7733e428f1d0f42cb578f6e9d28d1d0bb3e7b507c44e694b005e84e77e0d65d4c750c3036a86b2afc09e298488d54521"
+    },
+    {
+      "wraps": "dek_wrap_device",
+      "contextUtf8": "things:dek-wrap:device:v1",
+      "keyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "nonceHex": "000102030405060708090a0b",
+      "aadHex": "7468696e67733a64656b2d777261703a6465766963653a7631",
+      "plaintextUtf8": "0123456789abcdef0123456789abcdef",
+      "expectHex": "54454e5601010c000102030405060708090a0b7733e428f1d0f42cb578f6e9d28d1d0bb3e7b507c44e694b005e84e77e0d65d4031d9331baeb691eb57b3ace06ab9c91"
+    },
+    {
+      "wraps": "object.enc_key_wrap",
+      "contextUtf8": "things:object-key:v1",
+      "keyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "nonceHex": "000102030405060708090a0b",
+      "aadHex": "7468696e67733a6f626a6563742d6b65793a7631",
+      "plaintextUtf8": "0123456789abcdef0123456789abcdef",
+      "expectHex": "54454e5601010c000102030405060708090a0b7733e428f1d0f42cb578f6e9d28d1d0bb3e7b507c44e694b005e84e77e0d65d4447de56c00baa769675d74a28134c7b8"
+    },
+    {
+      "wraps": "backup container",
+      "contextUtf8": "things:backup:v1",
+      "keyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "nonceHex": "000102030405060708090a0b",
+      "aadHex": "7468696e67733a6261636b75703a7631",
+      "plaintextUtf8": "0123456789abcdef0123456789abcdef",
+      "expectHex": "54454e5601010c000102030405060708090a0b7733e428f1d0f42cb578f6e9d28d1d0bb3e7b507c44e694b005e84e77e0d65d4a75222129266e909722ad0a060897d52"
     }
   ],
   "openMustFail": [
@@ -126,5 +163,10 @@
         "path": "objects/e3/b0/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       }
     ]
-  }
+  },
+  "mustRun": [
+    "ts",
+    "swift"
+  ],
+  "caseCount": 9
 }

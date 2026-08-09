@@ -1,5 +1,6 @@
 {
   "$comment": "Search DSL parser conformance. Input string → AST. The AST is clock-free: relative dates stay symbolic and are resolved by the evaluator against an injected `now`.",
+  "$swiftCoverage": "NOT RUN BY core-swift. Its generic dispatcher only descends into a top-level `cases`/`vectors`/`tests`/`examples` array (this file has one) and then only asserts when a case carries `expected`/`parsed`/`ast` — these carry `expect`, so every case scores zero assertions and the file is reported as unmatched. Fixing it means teaching ConformanceVectorTests.checkSearchQuery to read `expect`, or reshaping the AST here to Swift's terms/phrases/excluded/filters spelling. The search DSL is a local query language, not wire format, so this is a UX divergence rather than a data one — which is why it is declared ts-only and loud rather than quietly claimed.",
   "version": 1,
   "cases": [
     {
@@ -476,5 +477,9 @@
         "sort": null
       }
     }
-  ]
+  ],
+  "mustRun": [
+    "ts"
+  ],
+  "caseCount": 31
 }

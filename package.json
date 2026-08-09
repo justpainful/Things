@@ -10,8 +10,7 @@
   "workspaces": [
     "packages/core-ts",
     "apps/server",
-    "apps/web",
-    "tools/shots"
+    "apps/web"
   ],
   "scripts": {
     "dev": "npm run dev --workspace @things/server",

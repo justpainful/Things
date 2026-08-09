@@ -1,48 +1,49 @@
 {
   "$comment": "Fractional sort_order. A reorder must be a single-row write; rebalancing is explicit and only happens when the gap degrades below minGap.",
+  "$swiftCoverage": "The `cases` array is run by core-swift’s checkFractionalOrder, which reads `prev`/`next` and `expectedOrder`. RESHAPED — these midpoints used to live under `between` with an `expect` field, which no Swift runner reads, so the file was silently skipped even though FractionalOrder and its runner both already existed. No expected VALUE changed. `forIndex`, `needsRebalance` and `rebalance` stay ts-only: core-swift has no runner for them.",
   "version": 1,
   "minGap": 0.000001,
   "defaultStep": 1,
-  "between": [
+  "cases": [
     {
       "prev": null,
       "next": null,
-      "expect": 1
+      "expectedOrder": 1
     },
     {
       "prev": null,
       "next": 5,
-      "expect": 4
+      "expectedOrder": 4
     },
     {
       "prev": 5,
       "next": null,
-      "expect": 6
+      "expectedOrder": 6
     },
     {
       "prev": 2,
       "next": 3,
-      "expect": 2.5
+      "expectedOrder": 2.5
     },
     {
       "prev": 1,
       "next": 2,
-      "expect": 1.5
+      "expectedOrder": 1.5
     },
     {
       "prev": 1.5,
       "next": 2,
-      "expect": 1.75
+      "expectedOrder": 1.75
     },
     {
       "prev": 0,
       "next": 1,
-      "expect": 0.5
+      "expectedOrder": 0.5
     },
     {
       "prev": -1,
       "next": 1,
-      "expect": 0
+      "expectedOrder": 0
     }
   ],
   "forIndex": [
@@ -155,5 +156,10 @@
         }
       ]
     }
-  ]
+  ],
+  "mustRun": [
+    "ts",
+    "swift"
+  ],
+  "caseCount": 8
 }

@@ -1,0 +1,91 @@
+{
+  "$comment": "vault.json — the UNENCRYPTED sidecar beside things.sqlite that holds the KDF salt, the KDF parameters and the wrapped DEKs (spec/crypto.md §3). It cannot live in the meta table: reading meta needs the database open, opening the database needs the DEK, and getting the DEK needs meta. Each case is a whole file: the object on the left, the exact bytes on disk on the right. Flat, string keys to string values only, sorted, no whitespace, NO trailing newline.",
+  "$swiftCoverage": "Every case is executed by core-swift’s checkCanonicalJSON (value + canonicalJson). That is the real thing being tested: FileVaultStorage writes exactly `JSONValue.object(members).canonicalJSON`, so these strings are literally the bytes core-swift produces. core-ts writes the same bytes through FileVault.",
+  "version": 1,
+  "layout": {
+    "filename": "vault.json",
+    "location": "beside things.sqlite in the library root",
+    "valueType": "string",
+    "trailingNewline": false,
+    "unknownKeys": "PRESERVED on write — read-modify-write the whole object, never rebuild it from a struct. Two cores and two app versions share this file.",
+    "required": [
+      "kdf_salt",
+      "kdf_params",
+      "dek_wrap_pin"
+    ],
+    "optional": [
+      "dek_wrap_device",
+      "dek_check",
+      "device_id",
+      "failed_pin_attempts"
+    ]
+  },
+  "inputs": {
+    "note": "How the wrapped values above were produced. Weak KDF parameters keep a conformance run fast.",
+    "pin": "123456",
+    "dekUtf8": "0123456789abcdef0123456789abcdef",
+    "kdfSaltHex": "0102030405060708090a0b0c0d0e0f10",
+    "kdfParams": {
+      "algorithm": "scrypt",
+      "N": 1024,
+      "r": 8,
+      "p": 1,
+      "dkLen": 32
+    },
+    "deviceSecretHex": "0909090909090909090909090909090909090909090909090909090909090909",
+    "pinWrapNonceHex": "0b0a090807060504030201ff",
+    "deviceWrapNonceHex": "ff0102030405060708090a0b"
+  },
+  "cases": [
+    {
+      "name": "a fully populated vault",
+      "value": {
+        "dek_check": "PrG9Q5lH63YpmOVmzMLgmc",
+        "dek_wrap_device": "VEVOVgEBDP8BAgMEBQYHCAkKC8BFZR32Q/LbOJ6lTpI/vRbX/F+dV5SKAq/mXMZkiwfnGjQanSIs6FMS8DZeZApIOg==",
+        "dek_wrap_pin": "VEVOVgEBDAsKCQgHBgUEAwIB/xznpgaKpeoGIF3NjRkZTWvR3E3UaQTID2bUWl4NnqVp4zOnYM8t9nzHdJqsWLUj2g==",
+        "device_id": "01890000-0000-7000-8000-0000000000aa",
+        "failed_pin_attempts": "0",
+        "kdf_params": "{\"N\":1024,\"algorithm\":\"scrypt\",\"dkLen\":32,\"p\":1,\"r\":8}",
+        "kdf_salt": "AQIDBAUGBwgJCgsMDQ4PEA=="
+      },
+      "canonicalJson": "{\"dek_check\":\"PrG9Q5lH63YpmOVmzMLgmc\",\"dek_wrap_device\":\"VEVOVgEBDP8BAgMEBQYHCAkKC8BFZR32Q/LbOJ6lTpI/vRbX/F+dV5SKAq/mXMZkiwfnGjQanSIs6FMS8DZeZApIOg==\",\"dek_wrap_pin\":\"VEVOVgEBDAsKCQgHBgUEAwIB/xznpgaKpeoGIF3NjRkZTWvR3E3UaQTID2bUWl4NnqVp4zOnYM8t9nzHdJqsWLUj2g==\",\"device_id\":\"01890000-0000-7000-8000-0000000000aa\",\"failed_pin_attempts\":\"0\",\"kdf_params\":\"{\\\"N\\\":1024,\\\"algorithm\\\":\\\"scrypt\\\",\\\"dkLen\\\":32,\\\"p\\\":1,\\\"r\\\":8}\",\"kdf_salt\":\"AQIDBAUGBwgJCgsMDQ4PEA==\"}"
+    },
+    {
+      "name": "no device wrapper — a normal state, spelled by omission and not by an empty string",
+      "value": {
+        "dek_check": "PrG9Q5lH63YpmOVmzMLgmc",
+        "dek_wrap_pin": "VEVOVgEBDAsKCQgHBgUEAwIB/xznpgaKpeoGIF3NjRkZTWvR3E3UaQTID2bUWl4NnqVp4zOnYM8t9nzHdJqsWLUj2g==",
+        "device_id": "01890000-0000-7000-8000-0000000000aa",
+        "failed_pin_attempts": "0",
+        "kdf_params": "{\"N\":1024,\"algorithm\":\"scrypt\",\"dkLen\":32,\"p\":1,\"r\":8}",
+        "kdf_salt": "AQIDBAUGBwgJCgsMDQ4PEA=="
+      },
+      "canonicalJson": "{\"dek_check\":\"PrG9Q5lH63YpmOVmzMLgmc\",\"dek_wrap_pin\":\"VEVOVgEBDAsKCQgHBgUEAwIB/xznpgaKpeoGIF3NjRkZTWvR3E3UaQTID2bUWl4NnqVp4zOnYM8t9nzHdJqsWLUj2g==\",\"device_id\":\"01890000-0000-7000-8000-0000000000aa\",\"failed_pin_attempts\":\"0\",\"kdf_params\":\"{\\\"N\\\":1024,\\\"algorithm\\\":\\\"scrypt\\\",\\\"dkLen\\\":32,\\\"p\\\":1,\\\"r\\\":8}\",\"kdf_salt\":\"AQIDBAUGBwgJCgsMDQ4PEA==\"}"
+    },
+    {
+      "name": "unknown keys written by another core or a newer version survive a rewrite",
+      "value": {
+        "dek_check": "PrG9Q5lH63YpmOVmzMLgmc",
+        "dek_wrap_device": "VEVOVgEBDP8BAgMEBQYHCAkKC8BFZR32Q/LbOJ6lTpI/vRbX/F+dV5SKAq/mXMZkiwfnGjQanSIs6FMS8DZeZApIOg==",
+        "dek_wrap_pin": "VEVOVgEBDAsKCQgHBgUEAwIB/xznpgaKpeoGIF3NjRkZTWvR3E3UaQTID2bUWl4NnqVp4zOnYM8t9nzHdJqsWLUj2g==",
+        "device_id": "01890000-0000-7000-8000-0000000000aa",
+        "failed_pin_attempts": "0",
+        "kdf_params": "{\"N\":1024,\"algorithm\":\"scrypt\",\"dkLen\":32,\"p\":1,\"r\":8}",
+        "kdf_salt": "AQIDBAUGBwgJCgsMDQ4PEA==",
+        "zz_future_key": "kept",
+        "aa_future_key": "also kept"
+      },
+      "canonicalJson": "{\"aa_future_key\":\"also kept\",\"dek_check\":\"PrG9Q5lH63YpmOVmzMLgmc\",\"dek_wrap_device\":\"VEVOVgEBDP8BAgMEBQYHCAkKC8BFZR32Q/LbOJ6lTpI/vRbX/F+dV5SKAq/mXMZkiwfnGjQanSIs6FMS8DZeZApIOg==\",\"dek_wrap_pin\":\"VEVOVgEBDAsKCQgHBgUEAwIB/xznpgaKpeoGIF3NjRkZTWvR3E3UaQTID2bUWl4NnqVp4zOnYM8t9nzHdJqsWLUj2g==\",\"device_id\":\"01890000-0000-7000-8000-0000000000aa\",\"failed_pin_attempts\":\"0\",\"kdf_params\":\"{\\\"N\\\":1024,\\\"algorithm\\\":\\\"scrypt\\\",\\\"dkLen\\\":32,\\\"p\\\":1,\\\"r\\\":8}\",\"kdf_salt\":\"AQIDBAUGBwgJCgsMDQ4PEA==\",\"zz_future_key\":\"kept\"}"
+    },
+    {
+      "name": "an unprovisioned library",
+      "value": {},
+      "canonicalJson": "{}"
+    }
+  ],
+  "mustRun": [
+    "ts",
+    "swift"
+  ],
+  "caseCount": 4
+}

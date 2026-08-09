@@ -1,0 +1,88 @@
+{
+  "$comment": "attrs_json and prev_json — spec/oplog.md §2 and §3. A change row crosses the wire verbatim, so these bytes ARE wire format. One serialisation, not two: keys sorted, no whitespace, minimal escaping, integers without exponents, null preserved. BLOBs use the {\"$b64\": …} wrapper because a bare base64 string is indistinguishable from a TEXT value — a reader expecting text would write the base64 AS text into a BLOB column, and a reader expecting the wrapper would write NULL. Either way the secret is destroyed on sync, in silence.",
+  "$swiftCoverage": "Every case is executed by core-swift’s checkCanonicalJSON (value + canonicalJson) against JSONValue.canonicalJSON — the same function Oplog.append uses to build attrs_json. This is a real cross-core byte comparison, not a shape check.",
+  "$note": "core-ts previously wrote JSON.stringify(attrs), i.e. insertion order, and JSON.stringify also emits \\b and \\f where spec/oplog.md §2 rule 3 requires \\u0008 and \\u000c. Both differences are pinned by the cases below.",
+  "version": 1,
+  "blobRule": "{\"$b64\": \"<base64>\"} for a BLOB column; null for a NULL BLOB",
+  "cases": [
+    {
+      "name": "keys are sorted, not written in insertion order",
+      "value": {
+        "title": "Second",
+        "updated_at": "2026-08-09T12:00:00.000Z",
+        "version_vector": "{\"a\":2}",
+        "id": "x"
+      },
+      "canonicalJson": "{\"id\":\"x\",\"title\":\"Second\",\"updated_at\":\"2026-08-09T12:00:00.000Z\",\"version_vector\":\"{\\\"a\\\":2}\"}"
+    },
+    {
+      "name": "a BLOB is the {\"$b64\": …} wrapper, never a bare base64 string",
+      "value": {
+        "value_cipher": {
+          "$b64": "VEVOVgEBDAABAgMEBQYHCAkKCyNnu3Tok6N3+CS65d6dVQyupOJVnFYsGVsVgPGLniD834Mj3eIsn94PxfO1"
+        },
+        "is_secret": 1
+      },
+      "canonicalJson": "{\"is_secret\":1,\"value_cipher\":{\"$b64\":\"VEVOVgEBDAABAgMEBQYHCAkKCyNnu3Tok6N3+CS65d6dVQyupOJVnFYsGVsVgPGLniD834Mj3eIsn94PxfO1\"}}"
+    },
+    {
+      "name": "null is a value and is preserved — absent means \"did not change\", null means \"set to NULL\"",
+      "value": {
+        "section_id": null,
+        "value_text": null,
+        "label": "Password"
+      },
+      "canonicalJson": "{\"label\":\"Password\",\"section_id\":null,\"value_text\":null}"
+    },
+    {
+      "name": "booleans are INTEGER 0/1, never true/false",
+      "value": {
+        "is_pinned": 1,
+        "is_locked": 0
+      },
+      "canonicalJson": "{\"is_locked\":0,\"is_pinned\":1}"
+    },
+    {
+      "name": "REAL uses the shortest round-tripping form; an integral value is written as an integer",
+      "value": {
+        "sort_order": 2.5,
+        "other_order": 3,
+        "big": 9007199254740991
+      },
+      "canonicalJson": "{\"big\":9007199254740991,\"other_order\":3,\"sort_order\":2.5}"
+    },
+    {
+      "name": "minimal string escaping — \\n \\r \\t \\\" \\\\ and \\u00XX for every other control character",
+      "value": {
+        "label": "line\nbreak\ttab \"quoted\" back\\slash bell\u0007 backspace\b formfeed\f"
+      },
+      "canonicalJson": "{\"label\":\"line\\nbreak\\ttab \\\"quoted\\\" back\\\\slash bell\\u0007 backspace\\u0008 formfeed\\u000c\"}"
+    },
+    {
+      "name": "non-ASCII is emitted as literal UTF-8, never \\u-escaped",
+      "value": {
+        "title": "Café — Ω 😀"
+      },
+      "canonicalJson": "{\"title\":\"Café — Ω 😀\"}"
+    },
+    {
+      "name": "an empty attribute map (a delete carries none)",
+      "value": {},
+      "canonicalJson": "{}"
+    },
+    {
+      "name": "prev_json is the same encoding — the prior values of the same columns",
+      "value": {
+        "value_cipher": null,
+        "value_text": "was plain text",
+        "updated_at": "2026-08-08T00:00:00.000Z"
+      },
+      "canonicalJson": "{\"updated_at\":\"2026-08-08T00:00:00.000Z\",\"value_cipher\":null,\"value_text\":\"was plain text\"}"
+    }
+  ],
+  "mustRun": [
+    "ts",
+    "swift"
+  ],
+  "caseCount": 9
+}

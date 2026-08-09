@@ -1,0 +1,60 @@
+{
+  "$comment": "The fixed context strings from spec/crypto.md §2.2 and §1.2, plus dek_check. These strings are wire format: they are the caller AAD of each wrapped key (and the HKDF info of KEK₂), and they are what stops one kind of wrapped key being presented as another. Colons, not dots — an earlier draft used dotted names and the two cores could not open each other’s wrapped DEK.",
+  "$swiftCoverage": "Every case is executed by core-swift’s checkSHA256 (bytesUtf8 → sha256). That verifies the byte string, not the constant in KeyHierarchy.Context; the constants themselves are pinned as-used by crypto-envelope.json’s seal cases, which core-swift runs byte-exactly. core-ts additionally asserts each string equals the constant its own code uses.",
+  "version": 1,
+  "cases": [
+    {
+      "name": "dek_wrap_pin",
+      "role": "GCM caller AAD of the TENV envelope holding this key",
+      "contextUtf8": "things:dek-wrap:pin:v1",
+      "bytesUtf8": "things:dek-wrap:pin:v1",
+      "utf8Hex": "7468696e67733a64656b2d777261703a70696e3a7631",
+      "sha256": "37ae81b2763e7a4ee6609b4beff7d897dbc475aae5689aa66dc4ab2ac9794dba"
+    },
+    {
+      "name": "dek_wrap_device",
+      "role": "GCM caller AAD of the TENV envelope holding this key",
+      "contextUtf8": "things:dek-wrap:device:v1",
+      "bytesUtf8": "things:dek-wrap:device:v1",
+      "utf8Hex": "7468696e67733a64656b2d777261703a6465766963653a7631",
+      "sha256": "b497957254ff55b12b241c4f4173c0234b3a1a50098cf886745a2055acee6724"
+    },
+    {
+      "name": "object.enc_key_wrap",
+      "role": "GCM caller AAD of the TENV envelope holding this key",
+      "contextUtf8": "things:object-key:v1",
+      "bytesUtf8": "things:object-key:v1",
+      "utf8Hex": "7468696e67733a6f626a6563742d6b65793a7631",
+      "sha256": "6a95d2eb37be82fcd98157458d54f6c49283aa74d91ee5c527ec5a65fb9fed13"
+    },
+    {
+      "name": "backup container",
+      "role": "GCM caller AAD of the TENV envelope holding this key",
+      "contextUtf8": "things:backup:v1",
+      "bytesUtf8": "things:backup:v1",
+      "utf8Hex": "7468696e67733a6261636b75703a7631",
+      "sha256": "0be99e5f79bce6570dd9d24481121d4cbf445d733d73b6ac1d19b16d933fbd6c"
+    },
+    {
+      "name": "kek2 HKDF info",
+      "role": "HKDF-SHA256 `info` for the device KEK — spec/crypto.md §1.2",
+      "contextUtf8": "things:kek2:v1",
+      "bytesUtf8": "things:kek2:v1",
+      "utf8Hex": "7468696e67733a6b656b323a7631",
+      "sha256": "72ed6d15f3503bd1d6b0557aa8c7a2e77e7a1a4945407381eca6d047e16bbc63"
+    },
+    {
+      "name": "dek_check",
+      "role": "base64(sha256(DEK)) truncated to 22 characters, stored in vault.json. NOT redundant with AES-GCM: GCM authenticates each wrapper in isolation and cannot prove that dek_wrap_pin and dek_wrap_device contain the SAME DEK. A stale device wrapper unwraps perfectly and yields the wrong key — SQLCipher then reports \"file is not a database\", which points nowhere. core-swift does not yet write or verify this; per spec/crypto.md §3.2 a writer MAY omit it but a reader that finds it MUST check it, so the Swift side needs the read half.",
+      "bytesUtf8": "0123456789abcdef0123456789abcdef",
+      "utf8Hex": "3031323334353637383961626364656630313233343536373839616263646566",
+      "sha256": "3eb1bd439947eb762998e566ccc2e099c791118b2f40579cc4f7da2b5061b7f9",
+      "dekCheck": "PrG9Q5lH63YpmOVmzMLgmc"
+    }
+  ],
+  "mustRun": [
+    "ts",
+    "swift"
+  ],
+  "caseCount": 6
+}

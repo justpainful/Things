@@ -1,5 +1,6 @@
 {
   "$comment": "Search evaluator conformance. Fixed documents + fixed `now` → the exact list of matching ids, in result order. Note d4: a locked Thing contributes nothing to content search but stays reachable via is:locked and tag:.",
+  "$swiftCoverage": "NOT RUN BY core-swift, for the same reason as search-parser.json: the cases carry `expect`, and no Swift runner reads that key. core-swift has no in-memory evaluator to run them against either. Declared ts-only rather than claimed.",
   "version": 1,
   "now": "2026-08-09T12:00:00.000Z",
   "docs": [
@@ -444,5 +445,9 @@
       "value": "someday",
       "expect": null
     }
-  ]
+  ],
+  "mustRun": [
+    "ts"
+  ],
+  "caseCount": 24
 }
