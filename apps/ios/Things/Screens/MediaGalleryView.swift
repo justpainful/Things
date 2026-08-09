@@ -15,6 +15,11 @@ struct MediaGalleryView: View {
     let thingID: String
 
     @State private var detail: ThingDetail?
+    /// Same lesson as the detail screen: without this, "loading", "nothing attached" and
+    /// "the query threw" are one indistinguishable spinner, and the screenshot that proves
+    /// the feature works looks identical to the one that proves it does not.
+    @State private var didReceiveValue = false
+    @State private var loadError: String?
     @State private var selectedFieldID: String?
 
     @State private var importer = AttachmentImporter()
@@ -54,6 +59,16 @@ struct MediaGalleryView: View {
                         .padding(Theme.Spacing.tight)
                     }
                 }
+            } else if let loadError {
+                EmptyStateView(symbol: "exclamationmark.triangle",
+                               title: "Couldn't open media",
+                               message: loadError)
+            } else if didReceiveValue {
+                EmptyStateView(symbol: "photo.on.rectangle",
+                               title: "No media yet",
+                               message: "Images, videos and icons you attach to this Thing show up here.",
+                               actionTitle: "Add Photo or File",
+                               action: { isPresentingChoice = true })
             } else {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -160,8 +175,11 @@ struct MediaGalleryView: View {
         do {
             for try await value in library.things.observeDetail(id: thingID) {
                 detail = value
+                didReceiveValue = true
             }
         } catch {
+            loadError = String(describing: error)
+            didReceiveValue = true
             model.errorMessage = "Could not load media. \(error)"
         }
     }

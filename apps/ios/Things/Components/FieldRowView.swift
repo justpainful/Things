@@ -392,18 +392,10 @@ struct FieldRowView: View {
                     onExpandEditor?()
                 }
             }
-            if isEditing {
-                Button {
-                    onCommit?(field.id)
-                } label: {
-                    Text("Done").font(.callout.weight(.semibold))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(Theme.Palette.accent)
-                .frame(minWidth: 44, minHeight: 44)
-                .contentShape(Rectangle())
-                .accessibilityIdentifier(A11y.Detail.fieldDone(field.id))
-            }
+            // No inline Done here. The keyboard toolbar in ThingDetailView already provides
+            // one, and it is the only one that works for a numeric keyboard or a multi-line
+            // field. Two Done buttons appeared at once, and the floating one covered the
+            // reveal control on the row below.
             if field.kind == .boolean {
                 Toggle("", isOn: booleanBinding)
                     .labelsHidden()

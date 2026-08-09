@@ -206,6 +206,11 @@ final class ScreenshotTour: XCTestCase {
         // Media gallery and the single-item viewer.
         if tapText("Studio Assets") {
             if tap(identifier: "detail.gallery") {
+                // Wait for a tile before photographing. Snapping immediately caught the
+                // loading spinner and produced an artifact that said nothing about whether
+                // attachments actually render.
+                _ = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'gallery.tile.'"))
+                    .firstMatch.waitForExistence(timeout: 5)
                 snap(9, "media-gallery", mode)
                 let tile = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'gallery.tile.'")).firstMatch
                 if tile.waitForExistence(timeout: 3) {
