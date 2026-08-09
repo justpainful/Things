@@ -1,0 +1,16 @@
+{
+  "name": "@things/shots",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Screenshot Tour baseline diffing — Tier 1 of the visual review loop.",
+  "bin": { "things-shots": "./diff.mjs" },
+  "scripts": {
+    "diff": "node diff.mjs",
+    "accept": "node diff.mjs --accept"
+  },
+  "dependencies": {
+    "pixelmatch": "^7.1.0",
+    "pngjs": "^7.0.0"
+  }
+}

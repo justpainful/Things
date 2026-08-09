@@ -1,0 +1,480 @@
+{
+  "$comment": "Search DSL parser conformance. Input string → AST. The AST is clock-free: relative dates stay symbolic and are resolved by the evaluator against an injected `now`.",
+  "version": 1,
+  "cases": [
+    {
+      "input": "",
+      "expect": {
+        "terms": [],
+        "sort": null
+      }
+    },
+    {
+      "input": "cloudflare",
+      "expect": {
+        "terms": [
+          {
+            "kind": "text",
+            "value": "cloudflare",
+            "phrase": false,
+            "negated": false
+          }
+        ],
+        "sort": null
+      }
+    },
+    {
+      "input": "Cloudflare Dashboard",
+      "expect": {
+        "terms": [
+          {
+            "kind": "text",
+            "value": "Cloudflare",
+            "phrase": false,
+            "negated": false
+          },
+          {
+            "kind": "text",
+            "value": "Dashboard",
+            "phrase": false,
+            "negated": false
+          }
+        ],
+        "sort": null
+      }
+    },
+    {
+      "input": "\"exact phrase\"",
+      "expect": {
+        "terms": [
+          {
+            "kind": "text",
+            "value": "exact phrase",
+            "phrase": true,
+            "negated": false
+          }
+        ],
+        "sort": null
+      }
+    },
+    {
+      "input": "-draft",
+      "expect": {
+        "terms": [
+          {
+            "kind": "text",
+            "value": "draft",
+            "phrase": false,
+            "negated": true
+          }
+        ],
+        "sort": null
+      }
+    },
+    {
+      "input": "-\"exact phrase\"",
+      "expect": {
+        "terms": [
+          {
+            "kind": "text",
+            "value": "exact phrase",
+            "phrase": true,
+            "negated": true
+          }
+        ],
+        "sort": null
+      }
+    },
+    {
+      "input": "tag:1980",
+      "expect": {
+        "terms": [
+          {
+            "kind": "filter",
+            "key": "tag",
+            "op": "eq",
+            "value": "1980",
+            "negated": false
+          }
+        ],
+        "sort": null
+      }
+    },
+    {
+      "input": "TAG:Infrastructure",
+      "expect": {
+        "terms": [
+          {
+            "kind": "filter",
+            "key": "tag",
+            "op": "eq",
+            "value": "infrastructure",
+            "negated": false
+          }
+        ],
+        "sort": null
+      }
+    },
+    {
+      "input": "type:image",
+      "expect": {
+        "terms": [
+          {
+            "kind": "filter",
+            "key": "type",
+            "op": "eq",
+            "value": "image",
+            "negated": false
+          }
+        ],
+        "sort": null
+      }
+    },
+    {
+      "input": "has:password",
+      "expect": {
+        "terms": [
+          {
+            "kind": "filter",
+            "key": "has",
+            "op": "eq",
+            "value": "password",
+            "negated": false
+          }
+        ],
+        "sort": null
+      }
+    },
+    {
+      "input": "has:file collection:1980",
+      "expect": {
+        "terms": [
+          {
+            "kind": "filter",
+            "key": "has",
+            "op": "eq",
+            "value": "file",
+            "negated": false
+          },
+          {
+            "kind": "filter",
+            "key": "collection",
+            "op": "eq",
+            "value": "1980",
+            "negated": false
+          }
+        ],
+        "sort": null
+      }
+    },
+    {
+      "input": "collection:\"Home Lab\"",
+      "expect": {
+        "terms": [
+          {
+            "kind": "text",
+            "value": "collection:Home Lab",
+            "phrase": true,
+            "negated": false
+          }
+        ],
+        "sort": null
+      }
+    },
+    {
+      "input": "device:RAEID-PC",
+      "expect": {
+        "terms": [
+          {
+            "kind": "filter",
+            "key": "device",
+            "op": "eq",
+            "value": "raeid-pc",
+            "negated": false
+          }
+        ],
+        "sort": null
+      }
+    },
+    {
+      "input": "modified:this-week",
+      "expect": {
+        "terms": [
+          {
+            "kind": "filter",
+            "key": "modified",
+            "op": "eq",
+            "value": "this-week",
+            "negated": false
+          }
+        ],
+        "sort": null
+      }
+    },
+    {
+      "input": "created:2026-08",
+      "expect": {
+        "terms": [
+          {
+            "kind": "filter",
+            "key": "created",
+            "op": "eq",
+            "value": "2026-08",
+            "negated": false
+          }
+        ],
+        "sort": null
+      }
+    },
+    {
+      "input": "created:>2026-01-01",
+      "expect": {
+        "terms": [
+          {
+            "kind": "filter",
+            "key": "created",
+            "op": "gt",
+            "value": "2026-01-01",
+            "negated": false
+          }
+        ],
+        "sort": null
+      }
+    },
+    {
+      "input": "created:<=2026-12-31",
+      "expect": {
+        "terms": [
+          {
+            "kind": "filter",
+            "key": "created",
+            "op": "lte",
+            "value": "2026-12-31",
+            "negated": false
+          }
+        ],
+        "sort": null
+      }
+    },
+    {
+      "input": "is:locked",
+      "expect": {
+        "terms": [
+          {
+            "kind": "filter",
+            "key": "is",
+            "op": "eq",
+            "value": "locked",
+            "negated": false
+          }
+        ],
+        "sort": null
+      }
+    },
+    {
+      "input": "is:pinned -is:archived",
+      "expect": {
+        "terms": [
+          {
+            "kind": "filter",
+            "key": "is",
+            "op": "eq",
+            "value": "pinned",
+            "negated": false
+          },
+          {
+            "kind": "filter",
+            "key": "is",
+            "op": "eq",
+            "value": "archived",
+            "negated": true
+          }
+        ],
+        "sort": null
+      }
+    },
+    {
+      "input": "size:>50mb",
+      "expect": {
+        "terms": [
+          {
+            "kind": "filter",
+            "key": "size",
+            "op": "gt",
+            "value": "52428800",
+            "negated": false
+          }
+        ],
+        "sort": null
+      }
+    },
+    {
+      "input": "size:<=1kb",
+      "expect": {
+        "terms": [
+          {
+            "kind": "filter",
+            "key": "size",
+            "op": "lte",
+            "value": "1024",
+            "negated": false
+          }
+        ],
+        "sort": null
+      }
+    },
+    {
+      "input": "size:100",
+      "expect": {
+        "terms": [
+          {
+            "kind": "filter",
+            "key": "size",
+            "op": "eq",
+            "value": "100",
+            "negated": false
+          }
+        ],
+        "sort": null
+      }
+    },
+    {
+      "input": "size:huge",
+      "expect": {
+        "terms": [
+          {
+            "kind": "text",
+            "value": "size:huge",
+            "phrase": false,
+            "negated": false
+          }
+        ],
+        "sort": null
+      }
+    },
+    {
+      "input": "sort:created",
+      "expect": {
+        "terms": [],
+        "sort": {
+          "field": "created",
+          "direction": "desc"
+        }
+      }
+    },
+    {
+      "input": "sort:title",
+      "expect": {
+        "terms": [],
+        "sort": {
+          "field": "title",
+          "direction": "asc"
+        }
+      }
+    },
+    {
+      "input": "sort:title.desc",
+      "expect": {
+        "terms": [],
+        "sort": {
+          "field": "title",
+          "direction": "desc"
+        }
+      }
+    },
+    {
+      "input": "sort:nonsense",
+      "expect": {
+        "terms": [
+          {
+            "kind": "text",
+            "value": "sort:nonsense",
+            "phrase": false,
+            "negated": false
+          }
+        ],
+        "sort": null
+      }
+    },
+    {
+      "input": "tag:1980 type:file -has:tag \"1980 Website\" sort:modified",
+      "expect": {
+        "terms": [
+          {
+            "kind": "filter",
+            "key": "tag",
+            "op": "eq",
+            "value": "1980",
+            "negated": false
+          },
+          {
+            "kind": "filter",
+            "key": "type",
+            "op": "eq",
+            "value": "file",
+            "negated": false
+          },
+          {
+            "kind": "filter",
+            "key": "has",
+            "op": "eq",
+            "value": "tag",
+            "negated": true
+          },
+          {
+            "kind": "text",
+            "value": "1980 Website",
+            "phrase": true,
+            "negated": false
+          }
+        ],
+        "sort": {
+          "field": "modified",
+          "direction": "desc"
+        }
+      }
+    },
+    {
+      "input": "colour:red",
+      "expect": {
+        "terms": [
+          {
+            "kind": "text",
+            "value": "colour:red",
+            "phrase": false,
+            "negated": false
+          }
+        ],
+        "sort": null
+      }
+    },
+    {
+      "input": "a\\ b",
+      "expect": {
+        "terms": [
+          {
+            "kind": "text",
+            "value": "a b",
+            "phrase": false,
+            "negated": false
+          }
+        ],
+        "sort": null
+      }
+    },
+    {
+      "input": "has:",
+      "expect": {
+        "terms": [
+          {
+            "kind": "text",
+            "value": "has:",
+            "phrase": false,
+            "negated": false
+          }
+        ],
+        "sort": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,122 @@
+name: IPA
+
+# Produces an UNSIGNED .ipa for sideloading with AltStore / SideStore.
+# There is no signing certificate on this runner and none is wanted: the sideloader re-signs
+# with the free Apple ID on the device and injects its own entitlements.
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+concurrency:
+  group: ipa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ipa:
+    runs-on: macos-26          # standard runner: free on public repos. Never use -large/-xlarge.
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Verify toolchain
+        run: xcodebuild -version
+
+      # Release binary (~5s) rather than `brew install xcodegen` (~90s).
+      - name: Install XcodeGen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if gh release download --repo yonaskolb/XcodeGen --pattern 'xcodegen.zip' --dir /tmp; then
+            unzip -q /tmp/xcodegen.zip -d /tmp/xcodegen
+            BIN=$(find /tmp/xcodegen -type f -name xcodegen -perm +111 | head -1)
+            sudo cp -R "$(dirname "$BIN")/../share/xcodegen" /usr/local/share/ 2>/dev/null || true
+            sudo cp "$BIN" /usr/local/bin/xcodegen
+            chmod +x /usr/local/bin/xcodegen
+          else
+            brew install xcodegen
+          fi
+          xcodegen --version
+
+      - name: Generate Xcode project
+        working-directory: apps/ios
+        run: xcodegen generate --quiet
+
+      # The bundle identifier must NOT drift between builds. The keychain access group is
+      # <TeamID>.<bundleID>, so a changed bundle ID makes every stored key unreachable and the
+      # vault opens empty on the next weekly refresh. docs/02-SECURITY.md §4.
+      - name: Assert stable bundle identifier
+        working-directory: apps/ios
+        run: |
+          set -euo pipefail
+          expected="com.things.app"
+          found=$(grep -E 'PRODUCT_BUNDLE_IDENTIFIER|bundleIdPrefix|CFBundleIdentifier' project.yml | head -5)
+          echo "$found"
+          if ! grep -q "$expected" project.yml; then
+            echo "::error::Bundle identifier is not $expected. Changing it orphans the keychain."
+            exit 1
+          fi
+
+      - uses: actions/cache@v6
+        with:
+          path: |
+            apps/ios/build/DerivedData/SourcePackages
+            ~/Library/Caches/org.swift.swiftpm
+          key: spm-${{ runner.os }}-${{ hashFiles('**/Package.resolved', 'apps/ios/project.yml') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      # `xcodebuild -exportArchive` cannot produce an unsigned ipa — every documented export
+      # method signs. Archive, then build the Payload/ zip by hand.
+      #
+      # A clean derived-data path for THIS step is deliberate: a documented Apple bug has
+      # unsigned builds reusing a stale binary ("with signing, xcodebuild rebuilds the Runner
+      # binary; without signing it does not"), which stamps the ipa with the wrong SDK.
+      - name: Archive (unsigned)
+        working-directory: apps/ios
+        run: |
+          set -o pipefail
+          rm -rf build/Archive build/Things.xcarchive
+          xcodebuild archive \
+            -project Things.xcodeproj \
+            -scheme Things \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$PWD/build/Things.xcarchive" \
+            -derivedDataPath "$PWD/build/Archive" \
+            -skipPackagePluginValidation -skipMacroValidation \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            DEVELOPMENT_TEAM="" \
+            | xcbeautify
+
+      - name: Package Payload/ into .ipa
+        working-directory: apps/ios
+        run: |
+          set -euo pipefail
+          app="build/Things.xcarchive/Products/Applications/Things.app"
+          if [ ! -d "$app" ]; then
+            echo "::error::$app not found. Archive layout changed — inspect the xcarchive."
+            find build/Things.xcarchive -maxdepth 4 -type d | head -40
+            exit 1
+          fi
+          rm -rf build/Payload && mkdir -p build/Payload
+          cp -R "$app" build/Payload/
+          ( cd build && zip -qry "Things-unsigned.ipa" Payload )
+          ls -lh build/Things-unsigned.ipa
+          echo "--- embedded Info.plist sanity ---"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier'      "$app/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion'        "$app/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print :DTPlatformVersion'       "$app/Info.plist" || true
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Things-unsigned-ipa
+          path: apps/ios/build/Things-unsigned.ipa
+          retention-days: 30
+          compression-level: 0
+          if-no-files-found: error

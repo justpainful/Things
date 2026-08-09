@@ -1,0 +1,159 @@
+{
+  "$comment": "Fractional sort_order. A reorder must be a single-row write; rebalancing is explicit and only happens when the gap degrades below minGap.",
+  "version": 1,
+  "minGap": 0.000001,
+  "defaultStep": 1,
+  "between": [
+    {
+      "prev": null,
+      "next": null,
+      "expect": 1
+    },
+    {
+      "prev": null,
+      "next": 5,
+      "expect": 4
+    },
+    {
+      "prev": 5,
+      "next": null,
+      "expect": 6
+    },
+    {
+      "prev": 2,
+      "next": 3,
+      "expect": 2.5
+    },
+    {
+      "prev": 1,
+      "next": 2,
+      "expect": 1.5
+    },
+    {
+      "prev": 1.5,
+      "next": 2,
+      "expect": 1.75
+    },
+    {
+      "prev": 0,
+      "next": 1,
+      "expect": 0.5
+    },
+    {
+      "prev": -1,
+      "next": 1,
+      "expect": 0
+    }
+  ],
+  "forIndex": [
+    {
+      "orders": [],
+      "index": 0,
+      "expect": 1
+    },
+    {
+      "orders": [
+        1,
+        2,
+        3
+      ],
+      "index": 0,
+      "expect": 0
+    },
+    {
+      "orders": [
+        1,
+        2,
+        3
+      ],
+      "index": 1,
+      "expect": 1.5
+    },
+    {
+      "orders": [
+        1,
+        2,
+        3
+      ],
+      "index": 2,
+      "expect": 2.5
+    },
+    {
+      "orders": [
+        1,
+        2,
+        3
+      ],
+      "index": 3,
+      "expect": 4
+    },
+    {
+      "orders": [
+        1,
+        2,
+        3
+      ],
+      "index": 99,
+      "expect": 4
+    },
+    {
+      "orders": [
+        3,
+        1,
+        2
+      ],
+      "index": 1,
+      "expect": 1.5
+    }
+  ],
+  "needsRebalance": [
+    {
+      "orders": [
+        1,
+        2,
+        3
+      ],
+      "expect": false
+    },
+    {
+      "orders": [
+        1,
+        1.0000001,
+        2
+      ],
+      "expect": true
+    }
+  ],
+  "rebalance": [
+    {
+      "items": [
+        {
+          "id": "c",
+          "sort_order": 1.0000001
+        },
+        {
+          "id": "a",
+          "sort_order": 1
+        },
+        {
+          "id": "b",
+          "sort_order": 1.00000005
+        }
+      ],
+      "expect": [
+        {
+          "id": "a",
+          "sort_order": 1
+        },
+        {
+          "id": "b",
+          "sort_order": 2
+        },
+        {
+          "id": "c",
+          "sort_order": 3
+        }
+      ]
+    }
+  ]
+}

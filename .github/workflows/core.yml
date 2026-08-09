@@ -1,0 +1,72 @@
+name: Core
+
+# Cheap, fast feedback on Ubuntu. Most of this project's logic lives here on purpose:
+# the macOS runner is slow and the developer machine is Windows, so anything that can be
+# proven without Xcode is proven here first. See docs/04-CI-AND-LOOP.md §1.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: core-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run build
+
+      - name: Test core + server
+        run: npm test
+
+      - name: Build web client
+        run: npm run build --workspace apps/web
+
+      # The vectors are the ONLY thing keeping the two independently-written cores compatible.
+      # This guard exists because that net already failed once: a runner matched files by a
+      # top-level `cases` array, two files lacked one, and they were silently skipped — green
+      # suite, byte-incompatible cores. Every vector must now declare who runs it and how many
+      # cases it holds, so an unrecognised file fails loudly instead of disappearing.
+      - name: Conformance vectors are declared and accounted for
+        run: node tools/spec/check-vectors.mjs
+
+  # This repo is PUBLIC and the app stores passwords. A committed database or key is a
+  # permanent public disclosure, so this gate is not optional. docs/02-SECURITY.md §8.
+  secrets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: No data files committed
+        run: |
+          set -euo pipefail
+          bad=$(git ls-files | grep -Ei '\.(sqlite|sqlite3|db|thingsbackup|p12|mobileprovision|key|pem)$' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::Data or credential files are committed:"; echo "$bad"; exit 1
+          fi
+          if git ls-files | grep -Eq '(^|/)(ThingsData|objects|thumbnails)/'; then
+            echo "::error::A data directory is committed."; exit 1
+          fi
+          echo "Clean."

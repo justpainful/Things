@@ -1,0 +1,206 @@
+{
+  "$comment": "Version vector comparison. A missing device counts as zero. `dominates` means A saw B; `concurrent` is the only case that produces a conflict.",
+  "version": 1,
+  "comparisons": [
+    {
+      "a": {},
+      "b": {},
+      "expect": "equal"
+    },
+    {
+      "a": {
+        "a": 1
+      },
+      "b": {
+        "a": 1
+      },
+      "expect": "equal"
+    },
+    {
+      "a": {
+        "a": 2
+      },
+      "b": {
+        "a": 1
+      },
+      "expect": "dominates"
+    },
+    {
+      "a": {
+        "a": 1
+      },
+      "b": {
+        "a": 2
+      },
+      "expect": "dominated"
+    },
+    {
+      "a": {
+        "a": 1
+      },
+      "b": {},
+      "expect": "dominates"
+    },
+    {
+      "a": {
+        "a": 1
+      },
+      "b": {
+        "b": 1
+      },
+      "expect": "concurrent"
+    },
+    {
+      "a": {
+        "a": 2,
+        "b": 1
+      },
+      "b": {
+        "a": 1,
+        "b": 2
+      },
+      "expect": "concurrent"
+    },
+    {
+      "a": {
+        "a": 2,
+        "b": 2
+      },
+      "b": {
+        "a": 1,
+        "b": 2
+      },
+      "expect": "dominates"
+    },
+    {
+      "a": {
+        "a": 1,
+        "b": 1,
+        "c": 1
+      },
+      "b": {
+        "a": 1,
+        "b": 1
+      },
+      "expect": "dominates"
+    }
+  ],
+  "merges": [
+    {
+      "a": {},
+      "b": {},
+      "expect": {}
+    },
+    {
+      "a": {
+        "a": 1
+      },
+      "b": {
+        "a": 1
+      },
+      "expect": {
+        "a": 1
+      }
+    },
+    {
+      "a": {
+        "a": 2
+      },
+      "b": {
+        "a": 1
+      },
+      "expect": {
+        "a": 2
+      }
+    },
+    {
+      "a": {
+        "a": 1
+      },
+      "b": {
+        "a": 2
+      },
+      "expect": {
+        "a": 2
+      }
+    },
+    {
+      "a": {
+        "a": 1
+      },
+      "b": {},
+      "expect": {
+        "a": 1
+      }
+    },
+    {
+      "a": {
+        "a": 1
+      },
+      "b": {
+        "b": 1
+      },
+      "expect": {
+        "a": 1,
+        "b": 1
+      }
+    },
+    {
+      "a": {
+        "a": 2,
+        "b": 1
+      },
+      "b": {
+        "a": 1,
+        "b": 2
+      },
+      "expect": {
+        "a": 2,
+        "b": 2
+      }
+    },
+    {
+      "a": {
+        "a": 2,
+        "b": 2
+      },
+      "b": {
+        "a": 1,
+        "b": 2
+      },
+      "expect": {
+        "a": 2,
+        "b": 2
+      }
+    },
+    {
+      "a": {
+        "a": 1,
+        "b": 1,
+        "c": 1
+      },
+      "b": {
+        "a": 1,
+        "b": 1
+      },
+      "expect": {
+        "a": 1,
+        "b": 1,
+        "c": 1
+      }
+    }
+  ],
+  "canonicalJson": [
+    {
+      "vector": {
+        "b": 1,
+        "a": 2
+      },
+      "expect": "{\"a\":2,\"b\":1}"
+    },
+    {
+      "vector": {},
+      "expect": "{}"
+    }
+  ]
+}

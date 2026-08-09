@@ -1,0 +1,17 @@
+{
+  "name": "@things/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Things — the web client. Vite + TypeScript. No framework, no CSS library, no CDN.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "watch": "vite build --watch",
+    "preview": "vite preview",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "vite": "^6.0.7"
+  }
+}

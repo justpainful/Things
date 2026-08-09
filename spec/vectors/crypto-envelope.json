@@ -1,0 +1,130 @@
+{
+  "$comment": "AES-256-GCM envelope, scrypt KDF, and framed object encryption. Every nonce and salt here is FIXED so the outputs are deterministic — production always uses random ones.",
+  "version": 1,
+  "envelopeLayout": {
+    "magic": "TENV",
+    "magicHex": "54454e56",
+    "versionByte": 1,
+    "algByte": 1,
+    "algorithm": "AES-256-GCM",
+    "nonceLength": 12,
+    "tagLength": 16,
+    "headerLength": 7,
+    "note": "The 7-byte header is prepended to the caller AAD before being fed to GCM, so a version or algorithm downgrade cannot be forged."
+  },
+  "fieldAad": {
+    "rule": "utf8(thing_id) || utf8(field_id) — both are fixed-length UUID strings, so no separator is needed.",
+    "thingId": "01890000-0000-7000-8000-00000000aaaa",
+    "fieldId": "01890000-0000-7000-8000-00000000bbbb",
+    "expectHex": "30313839303030302d303030302d373030302d383030302d30303030303030306161616130313839303030302d303030302d373030302d383030302d303030303030303062626262"
+  },
+  "seal": [
+    {
+      "keyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "nonceHex": "000102030405060708090a0b",
+      "aadHex": "",
+      "plaintextUtf8": "hello",
+      "expectHex": "54454e5601010c000102030405060708090a0b2f67ba77aa2184e1ac58ec695d41a3c1ab04f9687a"
+    },
+    {
+      "keyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "nonceHex": "000102030405060708090a0b",
+      "aadHex": "30313839303030302d303030302d373030302d383030302d30303030303030306161616130313839303030302d303030302d373030302d383030302d303030303030303062626262",
+      "plaintextUtf8": "demo-value-not-a-real-secret",
+      "expectHex": "54454e5601010c000102030405060708090a0b2367bb74e893a377f824bae5de9d550caea4e2559c562c195b1580f18b9e20fcdf8323dde22c9fde0fc5f3b5"
+    },
+    {
+      "keyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "nonceHex": "000102030405060708090a0b",
+      "aadHex": "",
+      "plaintextUtf8": "",
+      "expectHex": "54454e5601010c000102030405060708090a0b01d247fe1deb3f9d140ef63987d8a8e4"
+    }
+  ],
+  "openMustFail": [
+    {
+      "why": "AAD is bound to thing_id ‖ field_id — a ciphertext moved to another field must not open",
+      "envelopeHex": "54454e5601010c000102030405060708090a0b3467b569a091f649f53edc4a36375f251d822613caab",
+      "keyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "aadHex": "30313839303030302d303030302d373030302d383030302d30303030303030306161616130313839303030302d303030302d373030302d383030302d303030303030303063636363"
+    },
+    {
+      "why": "wrong key",
+      "envelopeHex": "54454e5601010c000102030405060708090a0b3467b569a091c50b05c9863aa6589987d4bff24ce949",
+      "keyHex": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "aadHex": ""
+    }
+  ],
+  "kdf": {
+    "algorithm": "scrypt",
+    "production": {
+      "N": 65536,
+      "r": 8,
+      "p": 2,
+      "dkLen": 32
+    },
+    "note": "The test parameters below are intentionally weak so a conformance run stays fast. Production parameters are asserted separately.",
+    "cases": [
+      {
+        "params": {
+          "N": 1024,
+          "r": 8,
+          "p": 1,
+          "dkLen": 32
+        },
+        "passwordUtf8": "123456",
+        "saltHex": "000102030405060708090a0b0c0d0e0f",
+        "expectHex": "40f3938aa2fd9937211d1f49d6ad544a8c2404524d1ab591846ecb6360cfcb79"
+      }
+    ]
+  },
+  "deviceKek": {
+    "rule": "HKDF-SHA256(ikm = device secret, salt = kdf salt, info = 'things:kek2:v1', length = 32)",
+    "deviceSecretHex": "0909090909090909090909090909090909090909090909090909090909090909",
+    "saltHex": "01010101010101010101010101010101",
+    "expectHex": "73d3aab62fd9f8daac1b096c61fd0f0ba701d76e031901600bc9d6bc304e89da"
+  },
+  "objectFrames": {
+    "layout": {
+      "magic": "TOBJ",
+      "versionByte": 1,
+      "algByte": 1,
+      "frameSizeOffset": 6,
+      "noncePrefixOffset": 10,
+      "headerLength": 18,
+      "frameSize": 1048576,
+      "frame": "4-byte big-endian ciphertext length, then ciphertext || 16-byte tag",
+      "nonce": "noncePrefix (8 bytes) || frameIndex (4 bytes big-endian)",
+      "aad": "frameIndex (4 bytes big-endian) || isLastFrame (1 byte)"
+    },
+    "cases": [
+      {
+        "keyHex": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+        "noncePrefixHex": "1122334455667788",
+        "plaintextUtf8": "things object frame vector",
+        "expectHex": "544f424a01010010000011223344556677880000002a7db095fff01dd8c5656d2ef6ef08d66997fcf913102877c170d7795c8b06039d659083021e82c823dbf8"
+      },
+      {
+        "keyHex": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+        "noncePrefixHex": "1122334455667788",
+        "plaintextUtf8": "",
+        "expectHex": "544f424a010100100000112233445566778800000010714d314f330d56396d34979ab82fa8c2"
+      }
+    ]
+  },
+  "objectPathFanout": {
+    "rule": "objects/<hash[0:2]>/<hash[2:4]>/<hash>, hash = lowercase hex sha256 of the PLAINTEXT bytes",
+    "examples": [
+      {
+        "plaintextUtf8": "hello objects",
+        "hash": "a97adbe8c6c64820b2394e1b723e30965525a25b6362b7246aa065352618e446",
+        "path": "objects/a9/7a/a97adbe8c6c64820b2394e1b723e30965525a25b6362b7246aa065352618e446"
+      },
+      {
+        "plaintextUtf8": "",
+        "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "path": "objects/e3/b0/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  }
+}

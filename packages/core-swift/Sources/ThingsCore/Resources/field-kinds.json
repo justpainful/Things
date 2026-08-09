@@ -1,0 +1,154 @@
+{
+  "$comment": "Things — field kind + variant registry. NORMATIVE. Adding a new field type is a change to THIS FILE ONLY, never a schema migration. Both cores load it verbatim.",
+  "version": 1,
+
+  "kinds": {
+    "text":       { "storage": "value_text",   "multiline": false },
+    "longText":   { "storage": "value_text",   "multiline": true },
+    "richText":   { "storage": "value_json",   "multiline": true },
+    "number":     { "storage": "value_text",   "note": "decimal STRING — avoids float drift between Swift and JS" },
+    "boolean":    { "storage": "value_text",   "values": ["0", "1"] },
+    "date":       { "storage": "value_text",   "note": "ISO-8601; value_json.precision = date|time|datetime" },
+    "url":        { "storage": "value_text" },
+    "path":       { "storage": "file_ref_id" },
+    "secret":     { "storage": "value_cipher", "alwaysSecret": true },
+    "attachment": { "storage": "object_hash",  "alt": "file_ref_id", "note": "attached bytes OR a reference to the original" },
+    "color":      { "storage": "value_text",   "format": "#RRGGBB" },
+    "code":       { "storage": "value_text",   "multiline": true, "note": "value_json.language" },
+    "geo":        { "storage": "value_json",   "shape": "{lat,lon}" },
+    "money":      { "storage": "value_json",   "shape": "{amount:\"12.50\",currency:\"SAR\"}" },
+    "relation":   { "storage": "value_text",   "note": "target thing id" },
+    "tagList":    { "storage": "thing_tag" }
+  },
+
+  "actions": {
+    "copy":           { "label": "Copy" },
+    "reveal":         { "label": "Reveal",          "gated": true },
+    "open":           { "label": "Open Link" },
+    "copyLink":       { "label": "Copy Link" },
+    "openInExplorer": { "label": "Open in Explorer", "deviceScoped": true },
+    "copyPath":       { "label": "Copy Path" },
+    "sendEmail":      { "label": "Send Email" },
+    "call":           { "label": "Call" },
+    "quickLook":      { "label": "Quick Look" },
+    "saveToFiles":    { "label": "Save to Files" },
+    "openThing":      { "label": "Open" }
+  },
+
+  "variants": [
+    { "id": "plain",         "kind": "text",       "label": "Text",           "symbol": "textformat",                    "actions": ["copy"] },
+    { "id": "username",      "kind": "text",       "label": "Username",       "symbol": "person",                        "actions": ["copy"] },
+    { "id": "email",         "kind": "text",       "label": "Email",          "symbol": "envelope",                      "actions": ["copy", "sendEmail"], "validate": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$" },
+    { "id": "phone",         "kind": "text",       "label": "Phone",          "symbol": "phone",                         "actions": ["copy", "call"] },
+    { "id": "address",       "kind": "longText",   "label": "Address",        "symbol": "mappin.and.ellipse",            "actions": ["copy"] },
+    { "id": "ip",            "kind": "text",       "label": "IP Address",     "symbol": "network",                       "actions": ["copy"] },
+    { "id": "port",          "kind": "number",     "label": "Port",           "symbol": "cable.connector",               "actions": ["copy"] },
+    { "id": "reference",     "kind": "text",       "label": "Reference",      "symbol": "number",                        "actions": ["copy"] },
+
+    { "id": "note",          "kind": "richText",   "label": "Note",           "symbol": "note.text",                     "actions": [] },
+    { "id": "longText",      "kind": "longText",   "label": "Long Text",      "symbol": "text.alignleft",                "actions": ["copy"] },
+
+    { "id": "password",      "kind": "secret",     "label": "Password",       "symbol": "key",                           "actions": ["copy", "reveal"], "marker": "has:password" },
+    { "id": "apiKey",        "kind": "secret",     "label": "API Key",        "symbol": "key.horizontal",                "actions": ["copy", "reveal"], "marker": "has:key" },
+    { "id": "token",         "kind": "secret",     "label": "Token",          "symbol": "ellipsis.rectangle",            "actions": ["copy", "reveal"], "marker": "has:key" },
+    { "id": "secret",        "kind": "secret",     "label": "Secret",         "symbol": "lock",                          "actions": ["copy", "reveal"], "marker": "has:secret" },
+    { "id": "sshKey",        "kind": "secret",     "label": "SSH Key",        "symbol": "terminal",                      "actions": ["copy", "reveal"], "marker": "has:key" },
+    { "id": "recoveryCodes", "kind": "secret",     "label": "Recovery Codes", "symbol": "list.number",                   "actions": ["copy", "reveal"], "marker": "has:secret" },
+    { "id": "pin",           "kind": "secret",     "label": "PIN",            "symbol": "circle.grid.3x3",               "actions": ["copy", "reveal"], "marker": "has:secret" },
+
+    { "id": "website",       "kind": "url",        "label": "Website",        "symbol": "safari",                        "actions": ["open", "copyLink"] },
+    { "id": "dashboard",     "kind": "url",        "label": "Dashboard",      "symbol": "gauge",                         "actions": ["open", "copyLink"] },
+    { "id": "youtube",       "kind": "url",        "label": "YouTube",        "symbol": "play.rectangle",  "match": "youtube\\.com|youtu\\.be",  "actions": ["open", "copyLink"] },
+    { "id": "github",        "kind": "url",        "label": "GitHub",         "symbol": "chevron.left.forwardslash.chevron.right", "match": "github\\.com", "actions": ["open", "copyLink"] },
+    { "id": "discord",       "kind": "url",        "label": "Discord",        "symbol": "bubble.left.and.bubble.right",  "match": "discord\\.(gg|com)", "actions": ["open", "copyLink"] },
+    { "id": "x",             "kind": "url",        "label": "X",              "symbol": "at",              "match": "(twitter|x)\\.com",         "actions": ["open", "copyLink"] },
+    { "id": "instagram",     "kind": "url",        "label": "Instagram",      "symbol": "camera",          "match": "instagram\\.com",           "actions": ["open", "copyLink"] },
+    { "id": "tiktok",        "kind": "url",        "label": "TikTok",         "symbol": "music.note",      "match": "tiktok\\.com",              "actions": ["open", "copyLink"] },
+    { "id": "steam",         "kind": "url",        "label": "Steam",          "symbol": "gamecontroller",  "match": "steam(community|powered)\\.com", "actions": ["open", "copyLink"] },
+
+    { "id": "file",          "kind": "path",       "label": "File Path",      "symbol": "doc",                           "actions": ["copyPath", "openInExplorer"] },
+    { "id": "folder",        "kind": "path",       "label": "Folder Path",    "symbol": "folder",                        "actions": ["copyPath", "openInExplorer"] },
+
+    { "id": "attachment",    "kind": "attachment", "label": "File",           "symbol": "paperclip",                     "actions": ["quickLook", "saveToFiles"], "marker": "has:file" },
+    { "id": "image",         "kind": "attachment", "label": "Image",          "symbol": "photo",           "gallery": true, "actions": ["quickLook", "saveToFiles"], "marker": "type:image" },
+    { "id": "video",         "kind": "attachment", "label": "Video",          "symbol": "film",            "gallery": true, "actions": ["quickLook", "saveToFiles"], "marker": "type:video" },
+    { "id": "audio",         "kind": "attachment", "label": "Audio",          "symbol": "waveform",                      "actions": ["quickLook", "saveToFiles"], "marker": "type:audio" },
+    { "id": "pdf",           "kind": "attachment", "label": "PDF",            "symbol": "doc.richtext",                  "actions": ["quickLook", "saveToFiles"], "marker": "type:document" },
+    { "id": "icon",          "kind": "attachment", "label": "Icon",           "symbol": "app",             "gallery": true, "actions": ["quickLook"], "marker": "type:image" },
+    { "id": "avatar",        "kind": "attachment", "label": "Avatar",         "symbol": "person.crop.circle", "gallery": true, "actions": ["quickLook"], "marker": "type:image" },
+    { "id": "logo",          "kind": "attachment", "label": "Logo",           "symbol": "seal",            "gallery": true, "actions": ["quickLook"], "marker": "type:image" },
+    { "id": "qr",            "kind": "attachment", "label": "QR Code",        "symbol": "qrcode",          "gallery": true, "actions": ["quickLook"], "marker": "type:image" },
+
+    { "id": "code",          "kind": "code",       "label": "Code",           "symbol": "curlybraces",                   "actions": ["copy"] },
+    { "id": "command",       "kind": "code",       "label": "Command",        "symbol": "terminal",                      "actions": ["copy"] },
+    { "id": "json",          "kind": "code",       "label": "JSON",           "symbol": "curlybraces.square",            "actions": ["copy"] },
+    { "id": "config",        "kind": "code",       "label": "Config",         "symbol": "gearshape",                     "actions": ["copy"] },
+
+    { "id": "date",          "kind": "date",       "label": "Date",           "symbol": "calendar",                      "actions": ["copy"] },
+    { "id": "datetime",      "kind": "date",       "label": "Date & Time",    "symbol": "clock",                         "actions": ["copy"] },
+    { "id": "boolean",       "kind": "boolean",    "label": "Yes / No",       "symbol": "checkmark.square",              "actions": [] },
+    { "id": "number",        "kind": "number",     "label": "Number",         "symbol": "number.square",                 "actions": ["copy"] },
+    { "id": "rating",        "kind": "number",     "label": "Rating",         "symbol": "star",            "max": 5,     "actions": [] },
+    { "id": "progress",      "kind": "number",     "label": "Progress",       "symbol": "chart.bar",       "max": 100,   "actions": [] },
+    { "id": "money",         "kind": "money",      "label": "Amount",         "symbol": "banknote",                      "actions": ["copy"] },
+    { "id": "color",         "kind": "color",      "label": "Color",          "symbol": "paintpalette",                  "actions": ["copy"] },
+    { "id": "geo",           "kind": "geo",        "label": "Coordinates",    "symbol": "location",                      "actions": ["copy"] },
+    { "id": "tags",          "kind": "tagList",    "label": "Tags",           "symbol": "tag",                           "actions": [] },
+    { "id": "relation",      "kind": "relation",   "label": "Related Thing",  "symbol": "link",                          "actions": ["openThing"] }
+  ],
+
+  "templates": [
+    { "id": "blank",   "name": "Blank Thing", "symbol": "square.dashed",     "sections": [] },
+    { "id": "account", "name": "Account",     "symbol": "person.crop.circle", "sections": [
+      { "title": null, "fields": [
+        { "variant": "email",    "label": "Email" },
+        { "variant": "username", "label": "Username" },
+        { "variant": "password", "label": "Password" },
+        { "variant": "website",  "label": "Website" },
+        { "variant": "note",     "label": "Notes" } ] } ] },
+    { "id": "person",  "name": "Person",      "symbol": "person",             "sections": [
+      { "title": null, "fields": [
+        { "variant": "plain", "label": "Name" },
+        { "variant": "phone", "label": "Phone" },
+        { "variant": "email", "label": "Email" },
+        { "variant": "note",  "label": "Notes" } ] } ] },
+    { "id": "server",  "name": "Server",      "symbol": "server.rack",        "sections": [
+      { "title": null, "fields": [
+        { "variant": "ip",       "label": "IP" },
+        { "variant": "port",     "label": "Port" },
+        { "variant": "username", "label": "Username" },
+        { "variant": "password", "label": "Password" },
+        { "variant": "folder",   "label": "Path" },
+        { "variant": "note",     "label": "Notes" } ] } ] },
+    { "id": "project", "name": "Project",     "symbol": "hammer",             "sections": [
+      { "title": null, "fields": [
+        { "variant": "github",  "label": "Repository" },
+        { "variant": "folder",  "label": "Path" },
+        { "variant": "website", "label": "Website" },
+        { "variant": "note",    "label": "Notes" } ] } ] },
+    { "id": "card",    "name": "Card",        "symbol": "creditcard",         "sections": [
+      { "title": null, "fields": [
+        { "variant": "plain",     "label": "Name" },
+        { "variant": "secret",    "label": "Reference" },
+        { "variant": "date",      "label": "Expiration" },
+        { "variant": "website",   "label": "Website" },
+        { "variant": "note",      "label": "Notes" } ] } ] }
+  ],
+
+  "smartViews": [
+    { "id": "recently-added",  "name": "Recently Added",  "symbol": "clock.badge.plus",   "query": "sort:created" },
+    { "id": "recently-edited", "name": "Recently Edited", "symbol": "pencil",             "query": "sort:modified" },
+    { "id": "pinned",          "name": "Pinned",          "symbol": "pin",                "query": "is:pinned" },
+    { "id": "images",          "name": "Images",          "symbol": "photo.on.rectangle", "query": "type:image" },
+    { "id": "videos",          "name": "Videos",          "symbol": "film.stack",         "query": "type:video" },
+    { "id": "documents",       "name": "Documents",       "symbol": "doc.on.doc",         "query": "type:document" },
+    { "id": "links",           "name": "Links",           "symbol": "link",               "query": "has:url" },
+    { "id": "accounts",        "name": "Accounts",        "symbol": "person.2",           "query": "has:password" },
+    { "id": "paths",           "name": "Paths",           "symbol": "folder",             "query": "has:path" },
+    { "id": "with-files",      "name": "With Attachments","symbol": "paperclip",          "query": "has:file" },
+    { "id": "untagged",        "name": "Untagged",        "symbol": "tag.slash",          "query": "-has:tag" },
+    { "id": "large-files",     "name": "Large Files",     "symbol": "externaldrive",      "query": "size:>50mb" },
+    { "id": "missing-files",   "name": "Missing Files",   "symbol": "exclamationmark.triangle", "query": "is:missing" },
+    { "id": "locked",          "name": "Locked",          "symbol": "lock",               "query": "is:locked" }
+  ]
+}

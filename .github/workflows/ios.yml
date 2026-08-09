@@ -1,0 +1,226 @@
+name: iOS
+
+# This is not a quality gate bolted onto development — it IS the development environment.
+# The developer machine is Windows, so this workflow is the only way anyone ever sees the app,
+# and its wall-clock time is the project's iteration speed. Optimised accordingly:
+#
+#   * ONE build pass (build-for-testing) feeding two test-without-building runs. Calling
+#     `xcodebuild test` twice was rebuilding the whole app twice — the single biggest waste.
+#   * XcodeGen fetched as a release binary (~5s) instead of `brew install` (~90s).
+#   * The simulator boots in the background while the build runs, instead of after it.
+#   * Screenshot diffing moved to a parallel Ubuntu job, off the macOS critical path.
+#
+# Facts here were verified 2026-08-09; see docs/04-CI-AND-LOOP.md.
+
+on:
+  push:
+    paths:
+      - 'apps/ios/**'
+      - 'packages/core-swift/**'
+      - 'spec/**'
+      - '.github/workflows/ios.yml'
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  # Only 5 concurrent macOS jobs exist across the whole account. Free a slot when superseded.
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # macos-26 standard runner => free and unlimited on public repos.
+  # NEVER use macos-26-large / -xlarge: larger runners are billed even on public repos.
+  SIM_NAME: iPhone 17 Pro
+  SIM_OS: '26.5'
+  DD: build/DerivedData
+
+jobs:
+  build-test-shoot:
+    runs-on: macos-26
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # Assert the environment rather than pinning a path: Xcode patch versions on the image
+      # rotate weekly, so a hardcoded /Applications/Xcode_26.5.app becomes a broken build on a
+      # Tuesday. The default Xcode (26.6 -> iOS 26.5 SDK) is what we want.
+      #
+      # The simulator boot is kicked off HERE, detached, so it warms up during the ~3 minutes of
+      # XcodeGen + package resolution + compilation instead of adding 30-60s after them.
+      - name: Verify toolchain and start simulator
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          if ! xcrun simctl list runtimes | grep -q "iOS ${SIM_OS}"; then
+            echo "::error::iOS ${SIM_OS} runtime is missing. Do NOT add -downloadPlatform:"
+            echo "::error::it costs 8-20 min, needs multiple GB on a 14 GB disk, and is not cacheable."
+            exit 1
+          fi
+          UDID=$(xcrun simctl list devices available \
+                 | grep -F "${SIM_NAME} (" | head -1 | grep -oE '[0-9A-F-]{36}')
+          if [ -z "$UDID" ]; then
+            echo "::error::Simulator '${SIM_NAME}' not found on this image. Available iPhones:"
+            xcrun simctl list devices available | grep -i iphone
+            exit 1
+          fi
+          echo "SIM_UDID=$UDID" >> "$GITHUB_ENV"
+          nohup xcrun simctl boot "$UDID" >/dev/null 2>&1 &
+          echo "Booting $UDID in the background."
+
+      # ~5s instead of ~90s for `brew install xcodegen`. Pulls the latest release rather than
+      # pinning a version that would silently rot.
+      - name: Install XcodeGen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if gh release download --repo yonaskolb/XcodeGen --pattern 'xcodegen.zip' --dir /tmp; then
+            unzip -q /tmp/xcodegen.zip -d /tmp/xcodegen
+            BIN=$(find /tmp/xcodegen -type f -name xcodegen -perm +111 | head -1)
+            sudo cp -R "$(dirname "$BIN")/../share/xcodegen" /usr/local/share/ 2>/dev/null || true
+            sudo cp "$BIN" /usr/local/bin/xcodegen
+            chmod +x /usr/local/bin/xcodegen
+          else
+            echo "Release download failed; falling back to Homebrew."
+            brew install xcodegen
+          fi
+          xcodegen --version
+
+      # The .xcodeproj is a build artifact. Nobody on this project can open Xcode to repair a
+      # corrupt .pbxproj, so project.yml is the only source of truth.
+      - name: Generate Xcode project
+        working-directory: apps/ios
+        run: xcodegen generate --quiet
+
+      # Cache SwiftPM only. DerivedData caching is a trap here: actions/checkout stamps every
+      # file with checkout time, Xcode tracks input mtimes at nanosecond resolution, so a
+      # restored DerivedData cache yields a 100% rebuild PLUS the restore cost.
+      - uses: actions/cache@v6
+        with:
+          path: |
+            apps/ios/build/DerivedData/SourcePackages
+            ~/Library/Caches/org.swift.swiftpm
+          key: spm-${{ runner.os }}-${{ hashFiles('**/Package.resolved', 'apps/ios/project.yml') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      # ── ONE build, two test runs ──────────────────────────────────────────
+      # `xcodebuild test` twice was compiling the app twice. build-for-testing compiles once;
+      # each test-without-building then costs only the run itself.
+      - name: Build for testing
+        working-directory: apps/ios
+        run: |
+          set -o pipefail
+          xcodebuild build-for-testing \
+            -project Things.xcodeproj -scheme Things \
+            -destination "platform=iOS Simulator,name=${SIM_NAME},OS=${SIM_OS}" \
+            -derivedDataPath "$PWD/${DD}" \
+            -skipPackagePluginValidation -skipMacroValidation \
+            ONLY_ACTIVE_ARCH=YES \
+            CODE_SIGNING_ALLOWED=NO | xcbeautify
+
+      # Includes the startup diagnostic for the one genuinely unverified dependency assumption:
+      # whether FTS5 is compiled into Zetetic's prebuilt SQLCipher binary.
+      - name: Unit tests
+        working-directory: apps/ios
+        run: |
+          set -o pipefail
+          rm -rf UnitResults.xcresult
+          xcodebuild test-without-building \
+            -project Things.xcodeproj -scheme Things \
+            -destination "platform=iOS Simulator,name=${SIM_NAME},OS=${SIM_OS}" \
+            -derivedDataPath "$PWD/${DD}" \
+            -resultBundlePath "$PWD/UnitResults.xcresult" \
+            -only-testing:ThingsTests | xcbeautify
+
+      # Parallel testing is disabled deliberately: it boots clones of the simulator, which
+      # breaks screenshot determinism and costs more than it saves for a tour this size.
+      - name: Screenshot Tour
+        working-directory: apps/ios
+        run: |
+          set -o pipefail
+          rm -rf TestResults.xcresult   # -resultBundlePath ERRORS if the path already exists
+          xcodebuild test-without-building \
+            -project Things.xcodeproj -scheme Things \
+            -destination "platform=iOS Simulator,name=${SIM_NAME},OS=${SIM_OS}" \
+            -derivedDataPath "$PWD/${DD}" \
+            -resultBundlePath "$PWD/TestResults.xcresult" \
+            -parallel-testing-enabled NO \
+            -only-testing:ThingsUITests | xcbeautify
+
+      # xcparse is dead on Xcode 26+ (fails with "does not appear to be an xcresult") and the
+      # legacy `xcresulttool get --legacy` is deprecated. This is the current supported path.
+      - name: Extract screenshots
+        if: always()
+        working-directory: apps/ios
+        run: |
+          set -euo pipefail
+          mkdir -p ../../artifacts/screenshots
+          xcrun xcresulttool export attachments \
+            --path TestResults.xcresult \
+            --output-path ../../artifacts/screenshots || true
+          count=$(find ../../artifacts/screenshots -type f -name '*.png' | wc -l | tr -d ' ')
+          echo "PNG count: $count"
+          find ../../artifacts/screenshots -type f | sort | head -100
+          if [ "$count" -eq 0 ]; then
+            echo "::error::No screenshots. The usual cause is a missing"
+            echo "::error::attachment.lifetime = .keepAlways — the default DISCARDS attachments"
+            echo "::error::when a test passes, which fails silently as a green build with no images."
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: screenshots
+          path: artifacts/screenshots/
+          retention-days: 14
+          compression-level: 0        # PNGs are already compressed
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: xcresult
+          path: apps/ios/*.xcresult
+          retention-days: 7
+
+  # Tier 1 review runs on Ubuntu, in parallel with nothing and costing no macOS minutes.
+  # It used to run on the macOS runner and needed `npm ci` over the whole workspace to do it,
+  # which is a lot of wall clock spent installing a web client in order to diff PNGs.
+  review:
+    needs: build-test-shoot
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: screenshots
+          path: artifacts/screenshots
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+
+      # Only the two pure-JS libraries the differ needs — not the workspace.
+      - name: Diff against baselines
+        continue-on-error: true
+        run: |
+          npm install --no-save --no-audit --no-fund pixelmatch pngjs
+          node tools/shots/diff.mjs || true
+          if [ -f screenshots/diff/summary.md ]; then
+            cat screenshots/diff/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # Just the screens that moved, plus pixel-diff overlays. Open this first; the full set
+      # is only needed when the diff points somewhere surprising.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: screenshots-changed
+          path: screenshots/diff/
+          retention-days: 14
+          compression-level: 0
+          if-no-files-found: ignore   # an empty diff means nothing moved. That is success.

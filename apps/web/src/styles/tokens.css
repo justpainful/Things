@@ -1,0 +1,211 @@
+/* ==========================================================================
+   Design tokens — docs/03-DESIGN.md §0
+
+   DARK FIRST, TRUE BLACK. The reference is Messages in dark mode: a pure
+   #000 canvas, neutral grey elevations, and chrome that is WHITE glass rather
+   than tinted glass. Light mode exists and is correct, but it is not what the
+   design is tuned against.
+
+   Every colour below is an ACTUAL Apple system value, not an approximation.
+   The exact alphas matter more than the hues: rgba(235,235,245,0.60) is what
+   makes secondary text read as iOS, and 0.62 does not.
+   ========================================================================== */
+
+:root {
+  color-scheme: dark light;
+
+  /* ---- Type. System font only; SF on Apple, Segoe on Windows. ---- */
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text",
+    "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+
+  --text-xs: 0.6875rem;   /* 11 — captions, counts */
+  --text-sm: 0.8125rem;   /* 13 — secondary */
+  --text-base: 0.875rem;  /* 14 — body, list rows */
+  --text-md: 0.9375rem;   /* 15 — field values */
+  --text-lg: 1.0625rem;   /* 17 — section titles (iOS body size) */
+  --text-xl: 1.375rem;    /* 22 — Thing title */
+  --text-2xl: 1.75rem;    /* 28 — empty states */
+
+  --leading-tight: 1.2;
+  --leading-normal: 1.45;
+  --leading-loose: 1.6;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* Apple tracks tighter at display sizes and looser at caption sizes. */
+  --track-tight: -0.022em;
+  --track-normal: -0.01em;
+  --track-loose: 0.01em;
+
+  /* ---- Spacing: 4px grid ---- */
+  --sp-1: 0.25rem;  --sp-2: 0.5rem;   --sp-3: 0.75rem;  --sp-4: 1rem;
+  --sp-5: 1.25rem;  --sp-6: 1.5rem;   --sp-8: 2rem;     --sp-10: 2.5rem;
+  --sp-12: 3rem;
+
+  /* ---- Radii. Concentric: inner = outer − padding. ---- */
+  --radius-xs: 4px;   --radius-sm: 6px;   --radius-md: 10px;
+  --radius-lg: 14px;  --radius-xl: 20px;  --radius-2xl: 28px;
+  --radius-pill: 999px;
+
+  /* ======================================================================
+     DARK — the primary identity. Apple iOS dark system colours.
+     ====================================================================== */
+
+  /* Backgrounds. #000 is deliberate: on OLED it is真 black and it is what
+     Messages, Photos, and Music actually use. #0d0d0f "soft black" is the
+     tell of an app imitating the look rather than adopting it. */
+  --bg-app: #000000;
+  --bg-content: #000000;
+  --bg-raised: #1c1c1e;        /* systemGray6 dark */
+  --bg-raised-2: #2c2c2e;      /* systemGray5 dark */
+  --bg-sunken: #000000;
+  --bg-field: #1c1c1e;
+
+  /* Fills — Apple's translucent greys. Used for chips, wells, inactive states.
+     These are grey-with-alpha, never solid, so they sit correctly on any
+     background including glass. */
+  --fill-1: rgba(120, 120, 128, 0.36);
+  --fill-2: rgba(120, 120, 128, 0.32);
+  --fill-3: rgba(118, 118, 128, 0.24);
+  --fill-4: rgba(118, 118, 128, 0.18);
+
+  --bg-row-hover: rgba(255, 255, 255, 0.06);
+  --bg-row-active: rgba(255, 255, 255, 0.10);
+  --bg-row-selected: rgba(255, 255, 255, 0.13);   /* neutral, NOT accent-tinted */
+
+  /* Labels — the exact iOS alphas. */
+  --ink: #ffffff;
+  --ink-secondary: rgba(235, 235, 245, 0.60);
+  --ink-tertiary: rgba(235, 235, 245, 0.30);
+  --ink-quaternary: rgba(235, 235, 245, 0.18);
+  --ink-on-accent: #ffffff;
+  --ink-on-glass: #ffffff;
+
+  /* Separators. iOS separators are grey-blue with alpha, never pure white. */
+  --line: rgba(84, 84, 88, 0.65);
+  --line-opaque: #38383a;
+  --hairline: rgba(84, 84, 88, 0.65);
+  --line-strong: rgba(120, 120, 128, 0.8);
+
+  /* Accent. Used SPARINGLY — selection is neutral, glass is white.
+     Blue appears on links, the focus ring, and destructive confirmation only. */
+  --accent: #0a84ff;           /* systemBlue dark */
+  --accent-hover: #3d9bff;
+  --accent-soft: rgba(10, 132, 255, 0.18);
+  --danger: #ff453a;           /* systemRed dark */
+  --danger-soft: rgba(255, 69, 58, 0.16);
+  --warning: #ff9f0a;          /* systemOrange dark */
+  --success: #30d158;          /* systemGreen dark */
+  --purple: #bf5af2;
+
+  --gray: #8e8e93;
+  --gray-2: #636366;
+  --gray-3: #48484a;
+
+  /* Opaque stand-in wherever glass is disabled. Must read as the same surface. */
+  --surface-opaque: #1c1c1e;
+
+  /* Shadows are near-black on a black canvas; elevation comes from the glass
+     rim and fill, not from a drop shadow. Keep these restrained. */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.6);
+  --shadow-md: 0 6px 20px -8px rgba(0, 0, 0, 0.8);
+  --shadow-lg: 0 24px 56px -24px rgba(0, 0, 0, 0.9), 0 2px 10px -4px rgba(0, 0, 0, 0.6);
+
+  /* ---- Motion: Apple's standard spring curve. Nothing bounces for decoration. */
+  --ease-standard: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 120ms;
+  --dur-base: 190ms;
+  --dur-slow: 280ms;
+
+  /* ---- Layout ---- */
+  --sidebar-inline-size: 15.5rem;
+  --list-inline-size: 22rem;
+  --toolbar-block-size: 3.25rem;
+}
+
+/* ==========================================================================
+   LIGHT — correct, but not the design driver.
+   ========================================================================== */
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg-app: #f2f2f7;         /* secondarySystemBackground light */
+    --bg-content: #ffffff;
+    --bg-raised: #ffffff;
+    --bg-raised-2: #f2f2f7;
+    --bg-sunken: #e5e5ea;
+    --bg-field: #f2f2f7;
+
+    --fill-1: rgba(120, 120, 128, 0.20);
+    --fill-2: rgba(120, 120, 128, 0.16);
+    --fill-3: rgba(118, 118, 128, 0.12);
+    --fill-4: rgba(116, 116, 128, 0.08);
+
+    --bg-row-hover: rgba(0, 0, 0, 0.045);
+    --bg-row-active: rgba(0, 0, 0, 0.08);
+    --bg-row-selected: rgba(0, 0, 0, 0.09);
+
+    --ink: #000000;
+    --ink-secondary: rgba(60, 60, 67, 0.60);
+    --ink-tertiary: rgba(60, 60, 67, 0.30);
+    --ink-quaternary: rgba(60, 60, 67, 0.18);
+    --ink-on-glass: #000000;
+
+    --line: rgba(60, 60, 67, 0.29);
+    --line-opaque: #c6c6c8;
+    --hairline: rgba(60, 60, 67, 0.29);
+    --line-strong: rgba(60, 60, 67, 0.5);
+
+    --accent: #007aff;
+    --accent-hover: #0062cc;
+    --accent-soft: rgba(0, 122, 255, 0.12);
+    --danger: #ff3b30;
+    --danger-soft: rgba(255, 59, 48, 0.12);
+    --warning: #ff9500;
+    --success: #34c759;
+    --purple: #af52de;
+
+    --gray: #8e8e93;
+    --gray-2: #aeaeb2;
+    --gray-3: #c7c7cc;
+
+    --surface-opaque: #f2f2f7;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.08);
+    --shadow-md: 0 6px 20px -8px rgba(0, 0, 0, 0.22);
+    --shadow-lg: 0 24px 56px -24px rgba(0, 0, 0, 0.3), 0 2px 10px -4px rgba(0, 0, 0, 0.14);
+  }
+}
+
+/* Increase Contrast — the web has no system material to lean on, so all four
+   accessibility preferences are ours to honour. */
+@media (prefers-contrast: more) {
+  :root {
+    --ink-secondary: rgba(235, 235, 245, 0.85);
+    --ink-tertiary: rgba(235, 235, 245, 0.6);
+    --line: rgba(255, 255, 255, 0.45);
+    --hairline: rgba(255, 255, 255, 0.5);
+    --line-strong: rgba(255, 255, 255, 0.7);
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --ink-secondary: rgba(0, 0, 0, 0.85);
+      --ink-tertiary: rgba(0, 0, 0, 0.6);
+      --line: rgba(0, 0, 0, 0.45);
+      --hairline: rgba(0, 0, 0, 0.5);
+      --line-strong: rgba(0, 0, 0, 0.7);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 1ms;
+    --dur-base: 1ms;
+    --dur-slow: 1ms;
+  }
+}

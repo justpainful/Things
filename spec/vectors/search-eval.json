@@ -1,0 +1,448 @@
+{
+  "$comment": "Search evaluator conformance. Fixed documents + fixed `now` → the exact list of matching ids, in result order. Note d4: a locked Thing contributes nothing to content search but stays reachable via is:locked and tag:.",
+  "version": 1,
+  "now": "2026-08-09T12:00:00.000Z",
+  "docs": [
+    {
+      "title": "Example Registrar",
+      "text": [
+        "Main account password",
+        "Website",
+        "https://registrar.example/"
+      ],
+      "tags": [
+        "infrastructure",
+        "billing"
+      ],
+      "collections": [
+        "Development"
+      ],
+      "markers": [
+        "has:password",
+        "has:url",
+        "has:secret",
+        "has:tag"
+      ],
+      "devices": [],
+      "created_at": "2026-08-05T10:00:00.000Z",
+      "updated_at": "2026-08-09T09:00:00.000Z",
+      "is_pinned": true,
+      "is_locked": false,
+      "is_archived": false,
+      "is_template": false,
+      "is_trashed": false,
+      "has_missing_file": false,
+      "has_conflict": false,
+      "max_object_size": 0,
+      "id": "d1"
+    },
+    {
+      "title": "Sample Project",
+      "text": [
+        "Repository",
+        "Working folder",
+        "D:\\Demo\\SampleProject"
+      ],
+      "tags": [
+        "active"
+      ],
+      "collections": [
+        "Development"
+      ],
+      "markers": [
+        "has:url",
+        "has:path",
+        "has:note",
+        "has:tag"
+      ],
+      "devices": [
+        "RAEID-PC"
+      ],
+      "created_at": "2026-07-20T00:00:00.000Z",
+      "updated_at": "2026-08-03T00:00:00.000Z",
+      "is_pinned": false,
+      "is_locked": false,
+      "is_archived": false,
+      "is_template": false,
+      "is_trashed": false,
+      "has_missing_file": false,
+      "has_conflict": false,
+      "max_object_size": 0,
+      "id": "d2"
+    },
+    {
+      "title": "Placeholder Artwork",
+      "text": [
+        "Placeholder 1",
+        "Placeholder 2"
+      ],
+      "tags": [],
+      "collections": [
+        "Media"
+      ],
+      "markers": [
+        "type:image",
+        "has:file"
+      ],
+      "devices": [],
+      "created_at": "2026-06-01T00:00:00.000Z",
+      "updated_at": "2026-06-02T00:00:00.000Z",
+      "is_pinned": false,
+      "is_locked": false,
+      "is_archived": false,
+      "is_template": false,
+      "is_trashed": false,
+      "has_missing_file": false,
+      "has_conflict": false,
+      "max_object_size": 65011712,
+      "id": "d3"
+    },
+    {
+      "title": "Private Records",
+      "text": [
+        "Recovery phrase"
+      ],
+      "tags": [
+        "personal"
+      ],
+      "collections": [],
+      "markers": [
+        "has:secret"
+      ],
+      "devices": [],
+      "created_at": "2026-08-01T00:00:00.000Z",
+      "updated_at": "2026-08-08T00:00:00.000Z",
+      "is_pinned": false,
+      "is_locked": true,
+      "is_archived": false,
+      "is_template": false,
+      "is_trashed": false,
+      "has_missing_file": false,
+      "has_conflict": false,
+      "max_object_size": 0,
+      "id": "d4"
+    },
+    {
+      "title": "Café Registrar",
+      "text": [
+        "diacritics test"
+      ],
+      "tags": [],
+      "collections": [],
+      "markers": [],
+      "devices": [],
+      "created_at": "2026-08-01T00:00:00.000Z",
+      "updated_at": "2026-08-08T00:00:00.000Z",
+      "is_pinned": false,
+      "is_locked": false,
+      "is_archived": false,
+      "is_template": false,
+      "is_trashed": false,
+      "has_missing_file": false,
+      "has_conflict": false,
+      "max_object_size": 0,
+      "id": "d5"
+    },
+    {
+      "title": "Deleted Thing",
+      "text": [],
+      "tags": [],
+      "collections": [],
+      "markers": [],
+      "devices": [],
+      "created_at": "2026-08-01T00:00:00.000Z",
+      "updated_at": "2026-08-08T00:00:00.000Z",
+      "is_pinned": false,
+      "is_locked": false,
+      "is_archived": false,
+      "is_template": false,
+      "is_trashed": true,
+      "has_missing_file": false,
+      "has_conflict": false,
+      "max_object_size": 0,
+      "id": "d6"
+    },
+    {
+      "title": "Account Template",
+      "text": [],
+      "tags": [],
+      "collections": [],
+      "markers": [],
+      "devices": [],
+      "created_at": "2026-08-01T00:00:00.000Z",
+      "updated_at": "2026-08-08T00:00:00.000Z",
+      "is_pinned": false,
+      "is_locked": false,
+      "is_archived": false,
+      "is_template": true,
+      "is_trashed": false,
+      "has_missing_file": false,
+      "has_conflict": false,
+      "max_object_size": 0,
+      "id": "d7"
+    },
+    {
+      "title": "Old Archive",
+      "text": [],
+      "tags": [],
+      "collections": [],
+      "markers": [],
+      "devices": [],
+      "created_at": "2026-08-01T00:00:00.000Z",
+      "updated_at": "2026-08-08T00:00:00.000Z",
+      "is_pinned": false,
+      "is_locked": false,
+      "is_archived": true,
+      "is_template": false,
+      "is_trashed": false,
+      "has_missing_file": false,
+      "has_conflict": false,
+      "max_object_size": 0,
+      "id": "d8"
+    }
+  ],
+  "cases": [
+    {
+      "query": "",
+      "expect": [
+        "d1",
+        "d4",
+        "d5",
+        "d2",
+        "d3"
+      ]
+    },
+    {
+      "query": "registrar",
+      "expect": [
+        "d1",
+        "d5"
+      ]
+    },
+    {
+      "query": "cafe",
+      "expect": [
+        "d5"
+      ]
+    },
+    {
+      "query": "\"Main account password\"",
+      "expect": [
+        "d1"
+      ]
+    },
+    {
+      "query": "tag:infrastructure",
+      "expect": [
+        "d1"
+      ]
+    },
+    {
+      "query": "-has:tag",
+      "expect": [
+        "d5",
+        "d3"
+      ]
+    },
+    {
+      "query": "has:password",
+      "expect": [
+        "d1"
+      ]
+    },
+    {
+      "query": "type:image",
+      "expect": [
+        "d3"
+      ]
+    },
+    {
+      "query": "size:>50mb",
+      "expect": [
+        "d3"
+      ]
+    },
+    {
+      "query": "collection:Development",
+      "expect": [
+        "d1",
+        "d2"
+      ]
+    },
+    {
+      "query": "device:RAEID-PC",
+      "expect": [
+        "d2"
+      ]
+    },
+    {
+      "query": "is:pinned",
+      "expect": [
+        "d1"
+      ]
+    },
+    {
+      "query": "is:locked",
+      "expect": [
+        "d4"
+      ]
+    },
+    {
+      "query": "is:trashed",
+      "expect": [
+        "d6"
+      ]
+    },
+    {
+      "query": "is:template",
+      "expect": [
+        "d7"
+      ]
+    },
+    {
+      "query": "modified:today",
+      "expect": [
+        "d1"
+      ]
+    },
+    {
+      "query": "created:2026-08",
+      "expect": [
+        "d1",
+        "d4",
+        "d5"
+      ]
+    },
+    {
+      "query": "created:<2026-07",
+      "expect": [
+        "d3"
+      ]
+    },
+    {
+      "query": "sort:title",
+      "expect": [
+        "d5",
+        "d1",
+        "d3",
+        "d4",
+        "d2"
+      ]
+    },
+    {
+      "query": "sort:created.asc",
+      "expect": [
+        "d3",
+        "d2",
+        "d4",
+        "d5",
+        "d1"
+      ]
+    },
+    {
+      "query": "registrar -tag:billing",
+      "expect": [
+        "d5"
+      ]
+    },
+    {
+      "query": "private",
+      "expect": []
+    },
+    {
+      "query": "has:secret",
+      "expect": [
+        "d1"
+      ]
+    },
+    {
+      "query": "tag:personal",
+      "expect": [
+        "d4"
+      ]
+    }
+  ],
+  "dateRanges": [
+    {
+      "value": "today",
+      "expect": {
+        "from": "2026-08-09T00:00:00.000Z",
+        "to": "2026-08-10T00:00:00.000Z"
+      }
+    },
+    {
+      "value": "yesterday",
+      "expect": {
+        "from": "2026-08-08T00:00:00.000Z",
+        "to": "2026-08-09T00:00:00.000Z"
+      }
+    },
+    {
+      "value": "this-week",
+      "expect": {
+        "from": "2026-08-03T00:00:00.000Z",
+        "to": "2026-08-10T00:00:00.000Z"
+      }
+    },
+    {
+      "value": "last-week",
+      "expect": {
+        "from": "2026-07-27T00:00:00.000Z",
+        "to": "2026-08-03T00:00:00.000Z"
+      }
+    },
+    {
+      "value": "this-month",
+      "expect": {
+        "from": "2026-08-01T00:00:00.000Z",
+        "to": "2026-09-01T00:00:00.000Z"
+      }
+    },
+    {
+      "value": "last-month",
+      "expect": {
+        "from": "2026-07-01T00:00:00.000Z",
+        "to": "2026-08-01T00:00:00.000Z"
+      }
+    },
+    {
+      "value": "this-year",
+      "expect": {
+        "from": "2026-01-01T00:00:00.000Z",
+        "to": "2027-01-01T00:00:00.000Z"
+      }
+    },
+    {
+      "value": "7d",
+      "expect": {
+        "from": "2026-08-03T00:00:00.000Z",
+        "to": "2026-08-10T00:00:00.000Z"
+      }
+    },
+    {
+      "value": "2026",
+      "expect": {
+        "from": "2026-01-01T00:00:00.000Z",
+        "to": "2027-01-01T00:00:00.000Z"
+      }
+    },
+    {
+      "value": "2026-08",
+      "expect": {
+        "from": "2026-08-01T00:00:00.000Z",
+        "to": "2026-09-01T00:00:00.000Z"
+      }
+    },
+    {
+      "value": "2026-08-09",
+      "expect": {
+        "from": "2026-08-09T00:00:00.000Z",
+        "to": "2026-08-10T00:00:00.000Z"
+      }
+    },
+    {
+      "value": "someday",
+      "expect": null
+    }
+  ]
+}

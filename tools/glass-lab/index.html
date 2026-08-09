@@ -1,0 +1,1309 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-backdrop="mesh" data-view="panels">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Liquid Glass Fidelity Lab — Things</title>
+<style>
+/* ============================================================================
+   LIQUID GLASS FIDELITY LAB
+   Self-contained. No network requests. Open from file://.
+   ========================================================================= */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+:root {
+  /* ---- Tunable material parameters (driven by the sliders) ---- */
+  --blur:       11px;   /* backdrop blur radius — moderate on purpose */
+  --sat:        1.85;   /* vibrancy: saturation of the backdrop */
+  --bright:     1.06;   /* slight luminance lift */
+  --refract:    48;     /* feDisplacementMap scale, in px */
+  --spec:       0.85;   /* specular highlight intensity 0..1 */
+  --tint:       0.11;   /* tint / fill opacity */
+  --radius:     26px;   /* outer corner radius */
+
+  /* ---- Derived / structural ---- */
+  --adapt:      0.24;   /* adaptive contrast: 0 = off, 0.5 = strong */
+  --band:       11px;   /* rim-lens band width */
+  --rim-scale:  1.055;  /* rim-lens magnification */
+  --pad:        7px;    /* toolbar padding -> concentric inner radius */
+
+  --ink:        #f4f5f7;
+  --ink-dim:    rgba(244,245,247,.62);
+  --ui-bg:      #0c0d11;
+  --ui-line:    rgba(255,255,255,.12);
+  --accent:     #66d9ff;
+
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+html[data-theme="light"] {
+  --ink:      #14161a;
+  --ink-dim:  rgba(20,22,26,.60);
+  --ui-bg:    #f3f4f7;
+  --ui-line:  rgba(0,0,0,.12);
+  --accent:   #0a72a8;
+}
+
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: var(--font);
+  color: var(--ink);
+  background: var(--ui-bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+/* ==========================================================================
+   THE BACKDROP. Glass is invisible over flat colour, so this is load-bearing.
+   It is a fixed, full-viewport stack behind everything. It must NEVER get a
+   `filter`, `opacity < 1` or `mask` — any of those would create a backdrop
+   root and every backdrop-filter on the page would silently sample nothing.
+   ========================================================================== */
+#stage {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: #0a0b0f;
+}
+html[data-theme="light"] #stage { background: #e8eaef; }
+
+.bdlayer { position: absolute; inset: -25%; display: none; }
+html[data-backdrop="mesh"]    .bd-mesh,
+html[data-backdrop="mesh"]    .bd-grain,
+html[data-backdrop="cards"]   .bd-cards,
+html[data-backdrop="stripes"] .bd-stripes,
+html[data-backdrop="light"]   .bd-light,
+html[data-backdrop="dark"]    .bd-dark { display: block; }
+
+/* (a) vivid photo-like gradient mesh */
+.bd-mesh {
+  background:
+    radial-gradient(38% 44% at 18% 24%, #ff2d78 0%, rgba(255,45,120,0) 62%),
+    radial-gradient(34% 40% at 78% 16%, #ffb020 0%, rgba(255,176,32,0) 60%),
+    radial-gradient(46% 52% at 62% 78%, #1e5cff 0%, rgba(30,92,255,0) 64%),
+    radial-gradient(40% 46% at 12% 82%, #00e0a8 0%, rgba(0,224,168,0) 62%),
+    radial-gradient(52% 60% at 92% 62%, #8b2bff 0%, rgba(139,43,255,0) 66%),
+    linear-gradient(200deg, #0b1230 0%, #23063a 46%, #04212b 100%);
+  animation: drift 46s ease-in-out infinite alternate;
+}
+.bd-grain {
+  inset: 0;
+  opacity: .16;
+  mix-blend-mode: overlay;
+  background-size: 220px 220px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+@keyframes drift {
+  0%   { transform: translate3d(-2%, -1%, 0) scale(1.06) rotate(0deg); }
+  50%  { transform: translate3d(3%, 2%, 0)  scale(1.14) rotate(4deg); }
+  100% { transform: translate3d(-3%, 2.5%, 0) scale(1.08) rotate(-3deg); }
+}
+
+/* (b) colourful scrolling grid of cards */
+.bd-cards { inset: -60% -25%; animation: scrollup 34s linear infinite; }
+.bd-cards .cardgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 14px;
+  padding: 14px;
+}
+.bd-cards .cardgrid > i {
+  display: block;
+  height: 96px;
+  border-radius: 16px;
+  box-shadow: 0 8px 22px -10px rgba(0,0,0,.6);
+}
+@keyframes scrollup {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(0, -33.33%, 0); }
+}
+
+/* (c) brutal legibility test */
+.bd-stripes {
+  background: repeating-linear-gradient(102deg, #000 0 26px, #fff 26px 52px);
+  animation: slide 18s linear infinite;
+}
+@keyframes slide {
+  from { transform: translate3d(0,0,0); }
+  to   { transform: translate3d(-104px, 0, 0); }
+}
+
+/* (d/e) plain */
+.bd-light { inset: 0; background: #f2f2f7; }
+.bd-dark  { inset: 0; background: #0a0a0c; }
+
+html[data-motion="off"] .bd-mesh,
+html[data-motion="off"] .bd-cards,
+html[data-motion="off"] .bd-stripes { animation-play-state: paused; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bd-mesh, .bd-cards, .bd-stripes { animation: none !important; }
+}
+
+/* ==========================================================================
+   THE GLASS ENGINE
+   Layer order inside .g (bottom -> top):
+     .bd    filtered backdrop            (backdrop-filter lives HERE, alone)
+     .rim   masked ring, magnified backdrop  (edge refraction, CSS-only route)
+     .tint  material fill
+     .spec  moving specular glint
+     .edge  0.5px border + inset arcs + inner shadow
+     .in    content
+
+   Gotchas encoded here, each one found the hard way:
+     1. backdrop-filter goes on a *child*, never on the element that also owns
+        overflow/border-radius, so clipping never fights the filter.
+     2. No `isolation: isolate`, and no ancestor with `filter`, `opacity < 1`,
+        `mask` or `contain: paint`. Every one of those creates a backdrop root,
+        and the filter then samples an empty group and renders nothing.
+     3. NO `mix-blend-mode` ANYWHERE INSIDE .g. A blended child forces its
+        parent to isolate, which is a backdrop root, which silently blanks
+        every backdrop-filter in the subtree. This is why adaptive contrast
+        below is done with contrast()/brightness() inside the filter chain
+        instead of the luminosity-blend layer you will see in most tutorials —
+        that layer cannot coexist with the effect it is meant to correct.
+     4. Nested backdrop-filters do not compose, so the icon buttons inside the
+        toolbar are plain translucent fills, not glass-in-glass.
+   ========================================================================== */
+.g {
+  position: relative;
+  border-radius: var(--r, var(--radius));
+  overflow: hidden;
+  transform: translateZ(0);
+  transition: transform .18s cubic-bezier(.2,.9,.25,1), box-shadow .2s ease;
+  box-shadow:
+    0 14px 34px -16px rgba(0,0,0,.62),
+    0 2px 8px -4px rgba(0,0,0,.4);
+}
+.g > .l {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.g > .in {
+  position: relative;
+  z-index: 1;
+}
+
+/* -- filtered backdrop -- */
+.g > .bd { background: transparent; }
+
+/* -- rim lens: masked ring carrying its own, stronger, magnified backdrop -- */
+.g > .rim {
+  border: var(--band) solid transparent;
+  background: transparent;
+  transform: scale(var(--rim-scale));
+  -webkit-backdrop-filter: blur(1.5px) saturate(2.2) brightness(1.08);
+  backdrop-filter: blur(1.5px) saturate(2.2) brightness(1.08);
+  -webkit-mask-image: linear-gradient(#000 0 0), linear-gradient(#000 0 0);
+  -webkit-mask-clip: padding-box, border-box;
+  -webkit-mask-composite: xor;
+  mask-image: linear-gradient(#000 0 0), linear-gradient(#000 0 0);
+  mask-clip: padding-box, border-box;
+  mask-composite: exclude;
+}
+
+/* -- material fill -- */
+.g > .tint {
+  background: linear-gradient(157deg,
+    rgba(255,255,255,calc(var(--tint) * 1.55)) 0%,
+    rgba(255,255,255,calc(var(--tint) * 0.30)) 52%,
+    rgba(255,255,255,calc(var(--tint) * 0.95)) 100%);
+}
+html[data-theme="light"] .g > .tint {
+  background: linear-gradient(157deg,
+    rgba(255,255,255,calc(var(--tint) * 2.6)) 0%,
+    rgba(255,255,255,calc(var(--tint) * 1.1)) 52%,
+    rgba(255,255,255,calc(var(--tint) * 2.0)) 100%);
+}
+
+/* -- specular glint that tracks the pointer -- */
+.g > .spec {
+  background:
+    radial-gradient(58% 78% at var(--px, 50%) var(--py, 0%),
+      rgba(255,255,255,calc(var(--spec) * .42)) 0%,
+      rgba(255,255,255,calc(var(--spec) * .10)) 42%,
+      rgba(255,255,255,0) 74%);
+  transition: opacity .2s ease;
+}
+
+/* -- depth: 0.5px bright border, bright top arc, dim bottom arc, inner shade.
+      inset box-shadow follows border-radius, so the arcs wrap the corners
+      exactly like a lit bevel would. -- */
+.g > .edge {
+  box-shadow:
+    inset 0  1px 0 rgba(255,255,255,calc(var(--spec) * .72)),
+    inset 0 -1px 0 rgba(255,255,255,calc(var(--spec) * .20)),
+    inset 0  0   0 .5px rgba(255,255,255,.30),
+    inset 0  10px 24px -16px rgba(255,255,255,calc(var(--spec) * .55)),
+    inset 0 -12px 28px -18px rgba(0,0,0,.60);
+}
+html[data-theme="light"] .g > .edge {
+  box-shadow:
+    inset 0  1px 0 rgba(255,255,255,calc(var(--spec) * .95)),
+    inset 0 -1px 0 rgba(255,255,255,calc(var(--spec) * .35)),
+    inset 0  0   0 .5px rgba(255,255,255,.55),
+    inset 0  10px 24px -16px rgba(255,255,255,calc(var(--spec) * .7)),
+    inset 0 -12px 28px -18px rgba(0,0,0,.28);
+}
+
+/* ---- interaction: refraction intensifies, glass compresses slightly ---- */
+.g.is-hover { box-shadow: 0 18px 42px -16px rgba(0,0,0,.7), 0 3px 10px -5px rgba(0,0,0,.45); }
+.g.is-press { transform: translateZ(0) scale(.986); }
+.g.is-press > .spec { opacity: 1.35; }
+
+/* ==========================================================================
+   CANDIDATES — which layers each technique switches on
+   ========================================================================== */
+
+/* --- A. naive frosted blur. The reject. --------------------------------- */
+.cA .g { box-shadow: none; }
+.cA .g > .rim,
+.cA .g > .spec,
+.cA .g > .edge { display: none; }
+.cA .g > .bd {
+  -webkit-backdrop-filter: blur(calc(var(--blur) * 1.9));
+  backdrop-filter: blur(calc(var(--blur) * 1.9));
+}
+.cA .g > .tint { background: rgba(255,255,255,.17); }
+html[data-theme="light"] .cA .g > .tint { background: rgba(255,255,255,.55); }
+
+/* --- B. vibrancy + depth, no refraction, no adaptive contrast ----------- */
+.cB .g > .rim { display: none; }
+.cB .g > .bd {
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(var(--sat)) brightness(var(--bright));
+  backdrop-filter: blur(var(--blur)) saturate(var(--sat)) brightness(var(--bright));
+}
+
+/* --- C. CSS rim-lens: B + masked magnified ring + adaptive contrast -----
+   contrast(<1) pulls the backdrop's luminance toward mid grey: whites come
+   down, blacks come up, hue survives. That is the legibility half of what
+   Apple's material does, and unlike a luminosity-blend layer it lives in the
+   filter chain, so it cannot isolate the group it is filtering. */
+.cC .g > .bd {
+  -webkit-backdrop-filter: blur(var(--blur)) contrast(calc(1 - var(--adapt) * .9)) brightness(var(--bright)) saturate(var(--sat));
+  backdrop-filter: blur(var(--blur)) contrast(calc(1 - var(--adapt) * .9)) brightness(var(--bright)) saturate(var(--sat));
+}
+
+/* --- D. SVG displacement refraction ------------------------------------- */
+.cD .g > .rim { display: none; }
+/* .bd backdrop-filter is assigned by JS: url(#id) blur() saturate() brightness() */
+
+/* --- E. hybrid "Things Glass" ------------------------------------------- */
+.cE .g > .rim { --band: 7px; --rim-scale: 1.03; }
+.cE .g { box-shadow: 0 16px 40px -18px rgba(0,0,0,.66), 0 2px 8px -4px rgba(0,0,0,.42); }
+
+/* ==========================================================================
+   SAMPLE CONTENT — identical in every candidate
+   ========================================================================== */
+.sample { display: flex; flex-direction: column; gap: 16px; align-items: stretch; }
+
+.g--bar { --r: calc(var(--radius) * .82); padding: var(--pad); }
+.g--bar .row { display: flex; gap: var(--pad); }
+.ib {
+  /* concentric radius: inner = outer − padding */
+  border-radius: calc(var(--r) - var(--pad));
+  flex: 1 1 0;
+  height: 40px;
+  border: 0;
+  display: grid;
+  place-items: center;
+  color: var(--ink);
+  background: rgba(255,255,255,.10);
+  box-shadow: inset 0 .5px 0 rgba(255,255,255,.35), inset 0 -.5px 0 rgba(0,0,0,.16);
+  cursor: pointer;
+  transition: background .15s ease, transform .12s ease;
+}
+html[data-theme="light"] .ib { background: rgba(255,255,255,.42); }
+.ib:hover  { background: rgba(255,255,255,.19); }
+.ib:active { transform: scale(.94); }
+.ib svg { width: 19px; height: 19px; display: block; }
+
+.g--card { --r: var(--radius); }
+.g--card .in { padding: 16px 18px 17px; }
+.g--card h4 { margin: 0 0 6px; font-size: 15.5px; font-weight: 600; letter-spacing: -.01em; }
+.g--card p  { margin: 0 0 3px; font-size: 13px; line-height: 1.45; color: var(--ink); opacity: .88; }
+.g--card p.dim { color: var(--ink-dim); font-size: 12px; margin-top: 7px; opacity: 1; }
+
+.g--pill { --r: 999px; align-self: flex-start; }
+.g--pill .in { padding: 10px 22px; font-size: 13.5px; font-weight: 600; letter-spacing: .005em; }
+
+/* ==========================================================================
+   PAGE CHROME
+   ========================================================================== */
+#app { position: relative; z-index: 1; }
+
+.bar-top {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  padding: 10px 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  background: color-mix(in srgb, var(--ui-bg) 74%, transparent);
+  -webkit-backdrop-filter: blur(22px) saturate(1.7);
+  backdrop-filter: blur(22px) saturate(1.7);
+  border-bottom: 1px solid var(--ui-line);
+}
+.brand { font-size: 13px; font-weight: 700; letter-spacing: .02em; margin-right: 4px; }
+.brand small { display: block; font-weight: 500; font-size: 10.5px; color: var(--ink-dim); letter-spacing: .04em; text-transform: uppercase; }
+
+.ctl { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--ink-dim); }
+.ctl > label { text-transform: uppercase; letter-spacing: .07em; font-weight: 600; font-size: 10px; }
+
+.seg { display: flex; border: 1px solid var(--ui-line); border-radius: 9px; overflow: hidden; }
+.seg button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ink-dim);
+  font: inherit;
+  font-size: 11.5px;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: background .12s ease, color .12s ease;
+}
+.seg button + button { border-left: 1px solid var(--ui-line); }
+.seg button:hover { color: var(--ink); background: rgba(128,128,128,.14); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--ui-bg); }
+
+main { padding: 26px 18px 60px; max-width: 1560px; margin: 0 auto; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(272px, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+/* Kept deliberately sheer: an opaque panel would flatten the very backdrop
+   the glass is supposed to be bending. The header gets its own local scrim
+   so the labels stay readable without veiling the sample area. */
+.panel {
+  border-radius: 20px;
+  padding: 0 15px 20px;
+  border: 1px solid var(--ui-line);
+  background: color-mix(in srgb, var(--ui-bg) 18%, transparent);
+}
+.panel > header {
+  margin: 0 -15px 16px;
+  padding: 15px 15px 13px;
+  border-radius: 19px 19px 0 0;
+  background: linear-gradient(to bottom,
+    color-mix(in srgb, var(--ui-bg) 92%, transparent) 0%,
+    color-mix(in srgb, var(--ui-bg) 82%, transparent) 72%,
+    color-mix(in srgb, var(--ui-bg) 0%, transparent) 100%);
+}
+.panel h3 {
+  margin: 0 0 5px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -.005em;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.tag {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--ink);
+  color: var(--ui-bg);
+}
+.panel .desc { margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--ink-dim); }
+.panel .status {
+  margin-top: 8px;
+  font-size: 10.5px;
+  font-family: var(--mono);
+  letter-spacing: .01em;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border-radius: 20px;
+  border: 1px solid var(--ui-line);
+}
+.status .dot { width: 6px; height: 6px; border-radius: 50%; background: #3ddc84; }
+.status.warn .dot { background: #ffb020; }
+.status.bad  .dot { background: #ff4d5e; }
+.panel.reject { border-color: rgba(255,77,94,.4); }
+.panel.reject .tag { background: #ff4d5e; color: #fff; }
+.panel.winner { border-color: rgba(61,220,132,.45); }
+.panel.winner .tag { background: #3ddc84; color: #06210f; }
+
+/* overlay comparison view: strip the frames, float all five over the same
+   band of backdrop so the sample under each is near-identical */
+html[data-view="overlay"] .grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+}
+html[data-view="overlay"] .panel {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+html[data-view="overlay"] .panel .desc,
+html[data-view="overlay"] .panel .status { display: none; }
+html[data-view="overlay"] .panel > header {
+  margin: 0 0 12px;
+  padding: 0;
+  background: none;
+}
+html[data-view="overlay"] .panel h3 { text-shadow: 0 1px 4px rgba(0,0,0,.85), 0 0 12px rgba(0,0,0,.6); }
+html[data-theme="light"][data-view="overlay"] .panel h3 { text-shadow: 0 1px 4px rgba(255,255,255,.9); }
+@media (max-width: 1100px) {
+  html[data-view="overlay"] .grid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+}
+
+/* ---- tuner ---- */
+.tuner {
+  margin-top: 30px;
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(340px, 1.25fr);
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 900px) { .tuner { grid-template-columns: 1fr; } }
+
+.pane {
+  border: 1px solid var(--ui-line);
+  border-radius: 18px;
+  padding: 18px;
+  background: color-mix(in srgb, var(--ui-bg) 78%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
+}
+.pane h2 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--ink-dim);
+  font-weight: 700;
+}
+.pane .lead { margin: 0 0 16px; font-size: 12.5px; color: var(--ink-dim); line-height: 1.55; }
+
+.slider { display: grid; grid-template-columns: 96px 1fr 62px; align-items: center; gap: 10px; margin-bottom: 11px; }
+.slider label { font-size: 11.5px; font-weight: 600; }
+.slider output { font-family: var(--mono); font-size: 11px; color: var(--accent); text-align: right; }
+input[type=range] {
+  appearance: none; -webkit-appearance: none;
+  width: 100%; height: 3px; border-radius: 3px;
+  background: var(--ui-line);
+  outline: none;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 15px; height: 15px; border-radius: 50%;
+  background: var(--ink);
+  border: 2px solid var(--ui-bg);
+  box-shadow: 0 1px 4px rgba(0,0,0,.45);
+  cursor: pointer;
+}
+input[type=range]::-moz-range-thumb {
+  width: 13px; height: 13px; border-radius: 50%;
+  background: var(--ink); border: 2px solid var(--ui-bg); cursor: pointer;
+}
+
+.readout {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.65;
+  white-space: pre;
+  overflow: auto;
+  max-height: 420px;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--ui-line);
+  background: rgba(0,0,0,.34);
+  color: #cfe8ff;
+  tab-size: 2;
+}
+html[data-theme="light"] .readout { background: rgba(255,255,255,.7); color: #123; }
+.readout::selection { background: var(--accent); color: #000; }
+
+.btn {
+  appearance: none;
+  border: 1px solid var(--ui-line);
+  background: transparent;
+  color: var(--ink);
+  font: inherit; font-size: 11.5px; font-weight: 600;
+  padding: 6px 13px; border-radius: 8px; cursor: pointer;
+  transition: background .12s ease;
+}
+.btn:hover { background: rgba(128,128,128,.16); }
+
+.tunerdemo {
+  margin-top: 16px;
+  border-radius: 14px;
+  padding: 22px;
+  min-height: 150px;
+  display: grid;
+  place-items: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ---- verdict ---- */
+.verdict { margin-top: 30px; }
+.verdict .pane { padding: 22px 24px; }
+.verdict h2 { font-size: 12px; }
+.verdict h3 { margin: 14px 0 6px; font-size: 14px; letter-spacing: -.01em; }
+.verdict p  { margin: 0 0 10px; font-size: 13.5px; line-height: 1.62; max-width: 78ch; }
+.verdict ul { margin: 0 0 12px; padding-left: 18px; }
+.verdict li { font-size: 13px; line-height: 1.6; margin-bottom: 5px; max-width: 76ch; }
+.verdict code { font-family: var(--mono); font-size: 12px; padding: 1px 5px; border-radius: 4px; background: rgba(128,128,128,.2); }
+.rank { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 16px; }
+.rank span {
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  padding: 4px 10px; border-radius: 20px; border: 1px solid var(--ui-line);
+}
+.rank span:first-child { background: #3ddc84; color: #06210f; border-color: transparent; }
+.rank span:last-child  { background: rgba(255,77,94,.16); border-color: rgba(255,77,94,.45); }
+
+footer { margin-top: 28px; font-size: 11px; color: var(--ink-dim); line-height: 1.6; }
+
+svg.defs { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }
+
+/* ==========================================================================
+   ACCESSIBILITY FALLBACKS — the same rules the Things web client should ship
+   ========================================================================== */
+@media (prefers-reduced-transparency: reduce) {
+  html:not([data-force-glass="on"]) .g > .bd,
+  html:not([data-force-glass="on"]) .g > .rim { display: none !important; }
+  html:not([data-force-glass="on"]) .g > .tint {
+    background: color-mix(in srgb, var(--ui-bg) 92%, transparent) !important;
+  }
+  html:not([data-force-glass="on"]) .g > .edge {
+    box-shadow: inset 0 0 0 1px var(--ui-line) !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .g { transition: none; }
+  .g > .spec { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ======================= BACKDROP (behind everything) ==================== -->
+<div id="stage" aria-hidden="true">
+  <div class="bdlayer bd-mesh"></div>
+  <div class="bdlayer bd-grain"></div>
+  <div class="bdlayer bd-cards"><div class="cardgrid" id="cardgrid"></div></div>
+  <div class="bdlayer bd-stripes"></div>
+  <div class="bdlayer bd-light"></div>
+  <div class="bdlayer bd-dark"></div>
+</div>
+
+<div id="app">
+
+  <!-- ============================ CONTROL BAR ============================= -->
+  <div class="bar-top">
+    <div class="brand">Liquid Glass Fidelity Lab<small>Things · web client material study</small></div>
+
+    <div class="ctl">
+      <label>Backdrop</label>
+      <div class="seg" id="segBackdrop">
+        <button data-v="mesh">Mesh</button>
+        <button data-v="cards">Cards</button>
+        <button data-v="stripes">Stripes</button>
+        <button data-v="light">Light</button>
+        <button data-v="dark">Dark</button>
+      </div>
+    </div>
+
+    <div class="ctl">
+      <label>Motion</label>
+      <div class="seg" id="segMotion">
+        <button data-v="on">Drift</button>
+        <button data-v="off">Pause</button>
+      </div>
+    </div>
+
+    <div class="ctl">
+      <label>Theme</label>
+      <div class="seg" id="segTheme">
+        <button data-v="dark">Dark</button>
+        <button data-v="light">Light</button>
+      </div>
+    </div>
+
+    <div class="ctl">
+      <label>View</label>
+      <div class="seg" id="segView">
+        <button data-v="panels">Panels</button>
+        <button data-v="overlay">Overlay compare</button>
+      </div>
+    </div>
+
+    <div class="ctl">
+      <label>Reduced&nbsp;transparency</label>
+      <div class="seg" id="segForce">
+        <button data-v="off">Respect OS</button>
+        <button data-v="on">Force glass</button>
+      </div>
+    </div>
+  </div>
+
+  <main>
+    <!-- ========================== CANDIDATES ============================== -->
+    <section class="grid" id="grid"></section>
+
+    <!-- ============================ TUNER ================================ -->
+    <section class="tuner">
+      <div class="pane">
+        <h2>Live tuning</h2>
+        <p class="lead">Every slider drives a CSS custom property that all five candidates read, so the comparison stays fair. Refraction re-scales the displacement map in place — no rebuild.</p>
+
+        <div class="slider"><label for="sBlur">Blur</label><input type="range" id="sBlur" min="0" max="40" step="1" value="11"><output id="oBlur"></output></div>
+        <div class="slider"><label for="sSat">Saturation</label><input type="range" id="sSat" min="1" max="3" step="0.05" value="1.85"><output id="oSat"></output></div>
+        <div class="slider"><label for="sRef">Refraction</label><input type="range" id="sRef" min="0" max="80" step="1" value="48"><output id="oRef"></output></div>
+        <div class="slider"><label for="sSpec">Highlight</label><input type="range" id="sSpec" min="0" max="1.6" step="0.05" value="0.85"><output id="oSpec"></output></div>
+        <div class="slider"><label for="sTint">Tint</label><input type="range" id="sTint" min="0" max="0.35" step="0.005" value="0.11"><output id="oTint"></output></div>
+        <div class="slider"><label for="sRad">Radius</label><input type="range" id="sRad" min="6" max="46" step="1" value="26"><output id="oRad"></output></div>
+        <div class="slider"><label for="sAdapt">Adaptive</label><input type="range" id="sAdapt" min="0" max="0.5" step="0.01" value="0.24"><output id="oAdapt"></output></div>
+        <div class="slider"><label for="sBright">Brightness</label><input type="range" id="sBright" min="0.85" max="1.35" step="0.01" value="1.06"><output id="oBright"></output></div>
+
+        <div class="tunerdemo" id="tunerDemo"></div>
+      </div>
+
+      <div class="pane">
+        <h2>Resulting CSS <button class="btn" id="copyBtn" style="float:right;margin-top:-4px">Copy</button></h2>
+        <p class="lead">Candidate E, at the current slider values. Paste straight into the Things web client.</p>
+        <div class="readout" id="readout"></div>
+      </div>
+    </section>
+
+    <!-- =========================== VERDICT =============================== -->
+    <section class="verdict">
+      <div class="pane">
+        <h2>Verdict</h2>
+        <div class="rank">
+          <span>E — Things Glass</span><span>D — SVG displacement</span><span>C — CSS rim-lens</span><span>B — Vibrant slab</span><span>A — Naive blur</span>
+        </div>
+
+        <h3>E is the closest to Apple's material, and it is not close.</h3>
+        <p>The thing that makes Liquid Glass read as an <em>object</em> rather than a translucent rectangle is that the background behind it is <strong>geometrically wrong at the rim and right in the middle</strong>. A real convex lozenge has near-zero surface slope across its face and a steep slope in the last few millimetres before the edge, so light entering near the rim gets bent hard: you see a squeezed, displaced, slightly magnified band of whatever is behind and just outside the shape, and then the centre snaps back to almost-clear. Only D and E reproduce that, because only they actually resample the backdrop per-pixel. Everything else is painting over the backdrop rather than bending it.</p>
+
+        <p>E beats D on four counts, all of which are visible on the stripe backdrop:</p>
+        <ul>
+          <li><strong>Chromatic dispersion.</strong> Real glass has a different refractive index per wavelength. E runs three displacement passes at ±6% scale and recombines the R, G and B channels, so the rim band picks up a faint warm/cool split. It is subtle to the point of subliminal, and removing it is instantly noticeable — the rim goes from "glass" to "smear".</li>
+          <li><strong>Adaptive contrast.</strong> <code>contrast(0.78)</code> inside the backdrop chain pulls the backdrop toward mid grey — whites come down, blacks come up — and a trailing <code>saturate()</code> puts back the chroma that costs. Over the white stripes the glass darkens, over the black stripes it lifts, and the label contrast ratio stops swinging. B and D both fail the stripe test at the text; E holds. Worth saying plainly: the <code>mix-blend-mode: luminosity</code> layer that every tutorial reaches for here <em>cannot work</em>. A blended child isolates its parent, an isolated group is a backdrop root, and every <code>backdrop-filter</code> in the subtree silently resolves to nothing. That bug was live in this page for one build; the filter-chain version has no such conflict and is cheaper.</li>
+          <li><strong>Belt and braces at the rim.</strong> E keeps a narrow CSS rim-lens ring on top of the SVG displacement. On Chromium the two reinforce each other; on Safari and Firefox — where <code>backdrop-filter: url(#…)</code> is parsed and then silently ignored — the ring is the only refraction left, and it carries the effect on its own. D degrades to plain B there with no warning.</li>
+          <li><strong>Interaction.</strong> Pointer-tracked specular, displacement scale ramping ~35% on press, and a 1.4% compression. The material responds by <em>changing shape and light</em>, not by changing colour — which is the correct read of what iOS does.</li>
+        </ul>
+
+        <h3>Why A must be rejected</h3>
+        <p>A is heavy blur plus a flat white fill. Three separate tells: the blur radius is roughly 2× what Apple uses, so the backdrop turns to mush and the glass reads as frosted plastic; there is no saturation lift, so colours behind it go <em>duller</em> when real glass makes them more alive; and the edge is a hard alpha cut with no border, no arc and no shadow, so it has no thickness and does not float. Put A next to E over the mesh backdrop and A looks like a screenshot with a bug.</p>
+
+        <h3>What to ship</h3>
+        <p>Adopt <strong>E</strong> for the Things web client, authored as a <code>.tg-glass</code> component with the layer stack intact. Ship <strong>C</strong> as the automatic degradation for non-Chromium engines — it is the same visual grammar minus the per-pixel resample, and users will not see the two side by side. Below that, <code>prefers-reduced-transparency</code> collapses everything to an opaque surface with a 1px border and the layout does not move a pixel. Details, cost and rollout notes are in <code>NOTES.md</code> next to this file.</p>
+      </div>
+    </section>
+
+    <footer id="foot"></footer>
+  </main>
+</div>
+
+<svg class="defs" id="defs" aria-hidden="true"><defs id="defsIn"></defs></svg>
+
+<script>
+"use strict";
+(function () {
+
+/* ==========================================================================
+   0. capability probe
+   ========================================================================== */
+const UA = navigator.userAgent;
+const SUP = {
+  backdrop: CSS.supports("backdrop-filter", "blur(1px)") || CSS.supports("-webkit-backdrop-filter", "blur(1px)"),
+  // Only Chromium runs an SVG filter reference inside backdrop-filter.
+  // Safari and Firefox parse the declaration and then drop the url() part.
+  svgBackdrop: /Chrome\/|Chromium\/|Edg\//.test(UA) && !/OPT\//.test(UA),
+  maskComposite: CSS.supports("mask-composite", "exclude") || CSS.supports("-webkit-mask-composite", "xor")
+};
+
+/* ==========================================================================
+   1. displacement-map generator
+   --------------------------------------------------------------------------
+   Builds an RGBA image whose R and G channels encode a 2-D offset vector:
+       byte 128  ->  0.5  ->  zero displacement
+       feDisplacementMap samples P(x + s*(R-0.5), y + s*(G-0.5))
+   The vector is the OUTWARD normal of a rounded-rect signed distance field,
+   scaled by a convex-lens slope term that is ~0 across the face and saturates
+   in the last `bevel` pixels before the edge. Sampling outward at the rim
+   pulls content from outside the shape inward: the squeezed, magnified band
+   that reads as glass thickness.
+   ========================================================================== */
+const mapCache = new Map();
+
+function buildMap(w, h, radius, bevel) {
+  const W = Math.max(4, Math.round(w));
+  const H = Math.max(4, Math.round(h));
+  const R = Math.min(radius, Math.min(W, H) / 2);
+  const B = Math.max(2, Math.min(bevel, Math.min(W, H) / 2.2));
+  const key = W + "x" + H + "r" + R.toFixed(1) + "b" + B.toFixed(1);
+  if (mapCache.has(key)) return mapCache.get(key);
+
+  const cv = document.createElement("canvas");
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext("2d", { willReadFrequently: false });
+  const img = ctx.createImageData(W, H);
+  const d = img.data;
+
+  const cx = W / 2, cy = H / 2, hx = W / 2, hy = H / 2;
+
+  // signed distance to a rounded rectangle; negative inside
+  function sdf(x, y) {
+    const qx = Math.abs(x - cx) - (hx - R);
+    const qy = Math.abs(y - cy) - (hy - R);
+    const mx = Math.max(qx, 0), my = Math.max(qy, 0);
+    return Math.hypot(mx, my) + Math.min(Math.max(qx, qy), 0) - R;
+  }
+
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const px = x + 0.5, py = y + 0.5;
+      const s = sdf(px, py);
+      const i = (y * W + x) * 4;
+      let dx = 0, dy = 0;
+
+      if (s < 0) {
+        const inward = -s;                       // px from the edge, inward
+        const t = Math.min(1, inward / B);       // 0 at rim, 1 past the bevel
+        const u = 1 - t;                         // 1 at rim, 0 on the face
+        // slope of a circular-arc cross-section: u / sqrt(1 - u^2)
+        const slope = u / Math.sqrt(Math.max(1e-3, 1 - u * u));
+        const amt = Math.min(1, slope * 0.5);
+        if (amt > 0) {
+          // outward normal = normalised gradient of the SDF
+          const gx = sdf(px + 1, py) - sdf(px - 1, py);
+          const gy = sdf(px, py + 1) - sdf(px, py - 1);
+          const gl = Math.hypot(gx, gy) || 1;
+          dx = (gx / gl) * amt;
+          dy = (gy / gl) * amt;
+        }
+      }
+
+      d[i]     = 128 + Math.round(Math.max(-1, Math.min(1, dx)) * 127);
+      d[i + 1] = 128 + Math.round(Math.max(-1, Math.min(1, dy)) * 127);
+      d[i + 2] = 128;
+      d[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const url = cv.toDataURL();
+  mapCache.set(key, url);
+  return url;
+}
+
+/* ==========================================================================
+   2. SVG filter plumbing
+   --------------------------------------------------------------------------
+   filterUnits="userSpaceOnUse" with an explicit region gives deterministic
+   geometry. The region is inflated by MARGIN so displaced samples can reach
+   content that lies just OUTSIDE the element — without that, the rim band
+   samples transparent black and you get a dark fringe.
+   color-interpolation-filters="sRGB" is mandatory: the linearRGB default
+   re-encodes the map's channel values and the offsets come out wrong.
+   ========================================================================== */
+const NS = "http://www.w3.org/2000/svg";
+const defsIn = document.getElementById("defsIn");
+const MARGIN = 80;
+let uid = 0;
+
+function svg(tag, attrs) {
+  const n = document.createElementNS(NS, tag);
+  for (const k in attrs) {
+    if (k === "href") { n.setAttributeNS(null, "href", attrs[k]); n.setAttribute("xlink:href", attrs[k]); }
+    else n.setAttribute(k, attrs[k]);
+  }
+  return n;
+}
+
+function makeFilter(id, chroma) {
+  const f = svg("filter", {
+    id: id,
+    filterUnits: "userSpaceOnUse",
+    primitiveUnits: "userSpaceOnUse",
+    "color-interpolation-filters": "sRGB",
+    x: -MARGIN, y: -MARGIN, width: 100 + 2 * MARGIN, height: 100 + 2 * MARGIN
+  });
+  const im = svg("feImage", {
+    x: 0, y: 0, width: 100, height: 100,
+    preserveAspectRatio: "none",
+    result: "map",
+    href: ""
+  });
+  f.appendChild(im);
+
+  const disps = [];
+  if (!chroma) {
+    const dm = svg("feDisplacementMap", {
+      in: "SourceGraphic", in2: "map", scale: 0,
+      xChannelSelector: "R", yChannelSelector: "G"
+    });
+    f.appendChild(dm);
+    disps.push({ node: dm, k: 1 });
+  } else {
+    // per-channel dispersion: three passes, recombined additively
+    const chans = [
+      { k: 1.065, m: "1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0", r: "cR" },
+      { k: 1.000, m: "0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0", r: "cG" },
+      { k: 0.935, m: "0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0", r: "cB" }
+    ];
+    chans.forEach(function (c, idx) {
+      const dm = svg("feDisplacementMap", {
+        in: "SourceGraphic", in2: "map", scale: 0,
+        xChannelSelector: "R", yChannelSelector: "G",
+        result: "d" + idx
+      });
+      f.appendChild(dm);
+      disps.push({ node: dm, k: c.k });
+      f.appendChild(svg("feColorMatrix", { in: "d" + idx, type: "matrix", values: c.m, result: c.r }));
+    });
+    f.appendChild(svg("feComposite", { in: "cR", in2: "cG", operator: "arithmetic", k1: 0, k2: 1, k3: 1, k4: 0, result: "cRG" }));
+    f.appendChild(svg("feComposite", { in: "cRG", in2: "cB", operator: "arithmetic", k1: 0, k2: 1, k3: 1, k4: 0 }));
+  }
+
+  defsIn.appendChild(f);
+  return { filter: f, image: im, disps: disps };
+}
+
+/* ==========================================================================
+   3. RefractGlass — wires one .g element to its own filter + map
+   ========================================================================== */
+const refractors = [];
+
+function RefractGlass(el, chroma) {
+  const bd = el.querySelector(".bd");
+  const id = "lg" + (++uid);
+  const parts = makeFilter(id, chroma);
+  // chroma implies candidate E, which is also the one carrying adaptive contrast
+  const self = { el: el, bd: bd, id: id, parts: parts, w: 0, h: 0, boost: 1, adaptive: chroma };
+
+  self.resize = function () {
+    const r = el.getBoundingClientRect();
+    const w = Math.round(r.width), h = Math.round(r.height);
+    if (!w || !h) return;
+    if (w === self.w && h === self.h && self._r === self.radius()) return;
+    self.w = w; self.h = h; self._r = self.radius();
+
+    parts.filter.setAttribute("x", -MARGIN);
+    parts.filter.setAttribute("y", -MARGIN);
+    parts.filter.setAttribute("width", w + 2 * MARGIN);
+    parts.filter.setAttribute("height", h + 2 * MARGIN);
+    parts.image.setAttribute("width", w);
+    parts.image.setAttribute("height", h);
+
+    const bevel = Math.max(8, Math.min(28, Math.min(w, h) * 0.22));
+    const url = buildMap(w, h, self._r, bevel);
+    parts.image.setAttributeNS(null, "href", url);
+    parts.image.setAttribute("xlink:href", url);
+  };
+
+  self.radius = function () {
+    const cs = getComputedStyle(el);
+    const v = parseFloat(cs.borderTopLeftRadius) || 0;
+    const r = el.getBoundingClientRect();
+    return Math.min(v, Math.min(r.width, r.height) / 2);
+  };
+
+  self.apply = function () {
+    const s = V.refract * self.boost;
+    parts.disps.forEach(function (d) { d.node.setAttribute("scale", (s * d.k).toFixed(2)); });
+    const css = (SUP.svgBackdrop ? "url(#" + id + ") " : "") +
+      "blur(" + V.blur + "px) " +
+      (self.adaptive ? "contrast(" + (1 - V.adapt * 0.9).toFixed(3) + ") " : "") +
+      "brightness(" + V.bright + ") saturate(" + V.sat + ")";
+    bd.style.webkitBackdropFilter = css;
+    bd.style.backdropFilter = css;
+  };
+
+  refractors.push(self);
+  return self;
+}
+
+/* ==========================================================================
+   4. markup
+   ========================================================================== */
+const ICONS = {
+  plus:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.4"/><path d="M8.6 12.2l2.4 2.4 4.5-4.9"/></svg>',
+  star:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 4.2l2.35 4.9 5.3.72-3.86 3.7.95 5.28L12 16.3l-4.74 2.5.95-5.28L4.35 9.82l5.3-.72z"/></svg>'
+};
+
+function glass(kind, inner) {
+  return '<div class="g g--' + kind + '">' +
+    '<div class="l bd"></div>' +
+    '<div class="l rim"></div>' +
+    '<div class="l tint"></div>' +
+    '<div class="l spec"></div>' +
+    '<div class="l edge"></div>' +
+    '<div class="in">' + inner + '</div>' +
+  '</div>';
+}
+
+const SAMPLE =
+  '<div class="sample">' +
+    glass("bar",
+      '<div class="row">' +
+        '<button class="ib" aria-label="New">' + ICONS.plus + '</button>' +
+        '<button class="ib" aria-label="Complete">' + ICONS.check + '</button>' +
+        '<button class="ib" aria-label="Flag">' + ICONS.star + '</button>' +
+      '</div>') +
+    glass("card",
+      '<h4>Ship the web client beta</h4>' +
+      '<p>The rim has to bend what is behind it.</p>' +
+      '<p>A blur alone reads as frosted plastic.</p>' +
+      '<p class="dim">Today · Things · Work</p>') +
+    glass("pill", 'Mark complete') +
+  '</div>';
+
+const CANDIDATES = [
+  { id: "A", cls: "cA", flag: "reject", name: "Naive frosted blur",
+    desc: "backdrop-filter: blur() plus a flat white fill. No vibrancy, no refraction, no edge light, no shadow. Included as the reference for what we are rejecting.",
+    support: function () { return SUP.backdrop ? ["ok", "renders · universal"] : ["bad", "backdrop-filter unsupported"]; } },
+
+  { id: "B", cls: "cB", flag: "", name: "Vibrant slab",
+    desc: "Moderate blur + saturate/brightness lift, gradient tint, 0.5px bright border, inset top/bottom arcs, inner shade and an outer drop shadow. Real depth — but the backdrop is never bent, and there is no adaptive contrast.",
+    support: function () { return SUP.backdrop ? ["ok", "renders · universal"] : ["bad", "backdrop-filter unsupported"]; } },
+
+  { id: "C", cls: "cC", flag: "", name: "CSS rim-lens",
+    desc: "B plus a mask-composited ring carrying its own stronger backdrop-filter and a transform: scale(), and adaptive contrast() in the filter chain. Fakes edge magnification with zero SVG. The cross-browser fallback.",
+    support: function () {
+      if (!SUP.backdrop) return ["bad", "backdrop-filter unsupported"];
+      return SUP.maskComposite ? ["ok", "renders · universal"] : ["warn", "mask-composite missing · ring degrades"];
+    } },
+
+  { id: "D", cls: "cD", flag: "", name: "SVG displacement rim",
+    desc: "A procedurally generated rounded-rect SDF displacement map drives feDisplacementMap inside backdrop-filter. Per-pixel resampling of the backdrop: true edge refraction, not a painted approximation.",
+    support: function () {
+      if (!SUP.backdrop) return ["bad", "backdrop-filter unsupported"];
+      return SUP.svgBackdrop ? ["ok", "renders · Chromium only"] : ["warn", "engine drops url() · flat blur only"];
+    } },
+
+  { id: "E", cls: "cE", flag: "winner", name: "Things Glass (hybrid)",
+    desc: "D plus per-channel chromatic dispersion, adaptive contrast, pointer-tracked specular, press response, and C's rim-lens ring underneath as a built-in non-Chromium fallback.",
+    support: function () {
+      if (!SUP.backdrop) return ["bad", "backdrop-filter unsupported"];
+      if (!SUP.svgBackdrop) return ["warn", "no SVG refraction · rim-lens carries it"];
+      return ["ok", "renders · full fidelity"];
+    } }
+];
+
+const grid = document.getElementById("grid");
+grid.innerHTML = CANDIDATES.map(function (c) {
+  const st = c.support();
+  return '<article class="panel ' + c.cls + (c.flag ? " " + c.flag : "") + '">' +
+    '<header>' +
+      '<h3><span class="tag">' + c.id + '</span>' + c.name + '</h3>' +
+      '<p class="desc">' + c.desc + '</p>' +
+      '<span class="status ' + (st[0] === "ok" ? "" : st[0]) + '"><i class="dot"></i>' + st[1] + '</span>' +
+    '</header>' + SAMPLE +
+  '</article>';
+}).join("");
+
+// tuner preview uses candidate E
+const tunerDemo = document.getElementById("tunerDemo");
+tunerDemo.className = "tunerdemo cE";
+tunerDemo.innerHTML = glass("card",
+  '<h4>Live tuning target</h4>' +
+  '<p>Candidate E at the current values.</p>' +
+  '<p class="dim">Drag a slider · drag the pointer across the glass</p>');
+
+/* ==========================================================================
+   5. state + controls
+   ========================================================================== */
+const html = document.documentElement;
+const readout = document.getElementById("readout");
+const V = { blur: 11, sat: 1.85, bright: 1.06, refract: 48, spec: 0.85, tint: 0.11, radius: 26, adapt: 0.24 };
+
+function seg(id, attr, initial, after) {
+  const box = document.getElementById(id);
+  function set(v) {
+    html.setAttribute(attr, v);
+    Array.prototype.forEach.call(box.children, function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.v === v));
+    });
+    if (after) after(v);
+  }
+  box.addEventListener("click", function (e) {
+    const b = e.target.closest("button");
+    if (b) set(b.dataset.v);
+  });
+  set(initial);
+}
+
+seg("segBackdrop", "data-backdrop", "mesh", function () { requestAnimationFrame(sync); });
+seg("segMotion",   "data-motion",   "on");
+seg("segTheme",    "data-theme",    "dark", function () { requestAnimationFrame(sync); });
+seg("segView",     "data-view",     "panels", function () { requestAnimationFrame(measureAll); });
+seg("segForce",    "data-force-glass", "off", function () { requestAnimationFrame(measureAll); });
+
+const SLIDERS = [
+  ["sBlur", "oBlur", "blur", "--blur", function (v) { return v + "px"; }, function (v) { return v + "px"; }],
+  ["sSat", "oSat", "sat", "--sat", String, function (v) { return (+v).toFixed(2); }],
+  ["sRef", "oRef", "refract", null, null, function (v) { return v + "px"; }],
+  ["sSpec", "oSpec", "spec", "--spec", String, function (v) { return (+v).toFixed(2); }],
+  ["sTint", "oTint", "tint", "--tint", String, function (v) { return (+v).toFixed(3); }],
+  ["sRad", "oRad", "radius", "--radius", function (v) { return v + "px"; }, function (v) { return v + "px"; }],
+  ["sAdapt", "oAdapt", "adapt", "--adapt", String, function (v) { return (+v).toFixed(2); }],
+  ["sBright", "oBright", "bright", "--bright", String, function (v) { return (+v).toFixed(2); }]
+];
+
+SLIDERS.forEach(function (s) {
+  const input = document.getElementById(s[0]);
+  const out = document.getElementById(s[1]);
+  function upd() {
+    const v = parseFloat(input.value);
+    V[s[2]] = v;
+    if (s[3]) html.style.setProperty(s[3], s[4](input.value));
+    out.textContent = s[5](input.value);
+    if (s[2] === "radius") { requestAnimationFrame(measureAll); } else { sync(); }
+  }
+  input.addEventListener("input", upd);
+  upd();
+});
+
+/* ==========================================================================
+   6. pointer response — specular tracking, press, refraction ramp
+   ========================================================================== */
+document.addEventListener("pointermove", function (e) {
+  const g = e.target.closest ? e.target.closest(".g") : null;
+  if (!g) return;
+  const r = g.getBoundingClientRect();
+  g.style.setProperty("--px", (((e.clientX - r.left) / r.width) * 100).toFixed(1) + "%");
+  g.style.setProperty("--py", (((e.clientY - r.top) / r.height) * 100).toFixed(1) + "%");
+}, { passive: true });
+
+document.addEventListener("pointerover", function (e) {
+  const g = e.target.closest ? e.target.closest(".g") : null;
+  if (g) { g.classList.add("is-hover"); setBoost(g, 1.14); }
+}, { passive: true });
+
+document.addEventListener("pointerout", function (e) {
+  const g = e.target.closest ? e.target.closest(".g") : null;
+  if (g && !g.contains(e.relatedTarget)) {
+    g.classList.remove("is-hover", "is-press");
+    g.style.setProperty("--px", "50%");
+    g.style.setProperty("--py", "0%");
+    setBoost(g, 1);
+  }
+}, { passive: true });
+
+document.addEventListener("pointerdown", function (e) {
+  const g = e.target.closest ? e.target.closest(".g") : null;
+  if (g) { g.classList.add("is-press"); setBoost(g, 1.38); }
+}, { passive: true });
+
+document.addEventListener("pointerup", function () {
+  document.querySelectorAll(".g.is-press").forEach(function (g) {
+    g.classList.remove("is-press");
+    setBoost(g, g.classList.contains("is-hover") ? 1.14 : 1);
+  });
+}, { passive: true });
+
+function setBoost(g, b) {
+  for (let i = 0; i < refractors.length; i++) {
+    if (refractors[i].el === g) { refractors[i].boost = b; refractors[i].apply(); return; }
+  }
+}
+
+/* ==========================================================================
+   7. wire up + measure
+   ========================================================================== */
+document.querySelectorAll(".cD .g, .cE .g, .tunerdemo .g").forEach(function (el) {
+  RefractGlass(el, el.closest(".cE, .tunerdemo") !== null);
+});
+
+function measureAll() { refractors.forEach(function (r) { r._r = -1; r.resize(); }); sync(); }
+function sync() { refractors.forEach(function (r) { r.apply(); }); writeReadout(); }
+
+let rt = 0;
+window.addEventListener("resize", function () {
+  clearTimeout(rt);
+  rt = setTimeout(measureAll, 120);
+});
+if (window.ResizeObserver) {
+  const ro = new ResizeObserver(function () { clearTimeout(rt); rt = setTimeout(measureAll, 90); });
+  refractors.forEach(function (r) { ro.observe(r.el); });
+}
+
+/* ==========================================================================
+   8. CSS readout
+   ========================================================================== */
+function writeReadout() {
+  const t = V.tint, s = V.spec;
+  const a1 = (t * 1.55).toFixed(3), a2 = (t * 0.30).toFixed(3), a3 = (t * 0.95).toFixed(3);
+  const e1 = (s * 0.72).toFixed(2), e2 = (s * 0.20).toFixed(2), e3 = (s * 0.55).toFixed(2);
+
+  readout.textContent =
+"/* Candidate E — \"Things Glass\". Layer stack, outer -> inner. */\n" +
+".tg-glass {\n" +
+"  --r: " + V.radius + "px;\n" +
+"  position: relative;\n" +
+"  border-radius: var(--r);\n" +
+"  overflow: hidden;\n" +
+"  box-shadow: 0 16px 40px -18px rgba(0,0,0,.66),\n" +
+"              0 2px 8px -4px rgba(0,0,0,.42);\n" +
+"}\n" +
+".tg-glass > .l { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; }\n" +
+"\n" +
+"/* 1 · refracted + vibrant + contrast-normalised backdrop.\n" +
+"      contrast(<1) pulls the backdrop toward mid grey, so the glass darkens\n" +
+"      over light content and lifts over dark content — adaptive legibility\n" +
+"      without a blend layer. saturate() runs last to restore the chroma that\n" +
+"      contrast() costs. */\n" +
+".tg-glass > .bd {\n" +
+"  backdrop-filter: url(#tg-refract)\n" +
+"                   blur(" + V.blur + "px)\n" +
+"                   contrast(" + (1 - V.adapt * 0.9).toFixed(3) + ")\n" +
+"                   brightness(" + V.bright.toFixed(2) + ")\n" +
+"                   saturate(" + V.sat.toFixed(2) + ");\n" +
+"}\n" +
+"\n" +
+"/* 2 · rim lens — cross-browser refraction, and the Safari/Firefox fallback */\n" +
+".tg-glass > .rim {\n" +
+"  border: 7px solid transparent;\n" +
+"  transform: scale(1.03);\n" +
+"  backdrop-filter: blur(1.5px) saturate(2.2) brightness(1.08);\n" +
+"  mask-image: linear-gradient(#000 0 0), linear-gradient(#000 0 0);\n" +
+"  mask-clip: padding-box, border-box;\n" +
+"  mask-composite: exclude;\n" +
+"}\n" +
+"\n" +
+"/* !! DO NOT add a mix-blend-mode layer inside .tg-glass. A blended child\n" +
+"      isolates its parent, an isolated group is a backdrop root, and every\n" +
+"      backdrop-filter above resolves to nothing. Verified in Chromium. */\n" +
+"\n" +
+"/* 3 · material fill */\n" +
+".tg-glass > .tint {\n" +
+"  background: linear-gradient(157deg,\n" +
+"    rgba(255,255,255," + a1 + ") 0%,\n" +
+"    rgba(255,255,255," + a2 + ") 52%,\n" +
+"    rgba(255,255,255," + a3 + ") 100%);\n" +
+"}\n" +
+"\n" +
+"/* 4 · specular glint, tracks the pointer via --px / --py */\n" +
+".tg-glass > .spec {\n" +
+"  background: radial-gradient(58% 78% at var(--px,50%) var(--py,0%),\n" +
+"    rgba(255,255,255," + (s * 0.42).toFixed(2) + ") 0%,\n" +
+"    rgba(255,255,255," + (s * 0.10).toFixed(2) + ") 42%,\n" +
+"    rgba(255,255,255,0) 74%);\n" +
+"}\n" +
+"\n" +
+"/* 5 · depth: 0.5px border, bright top arc, dim bottom arc, inner shade */\n" +
+".tg-glass > .edge {\n" +
+"  box-shadow:\n" +
+"    inset 0  1px 0 rgba(255,255,255," + e1 + "),\n" +
+"    inset 0 -1px 0 rgba(255,255,255," + e2 + "),\n" +
+"    inset 0  0   0 .5px rgba(255,255,255,.30),\n" +
+"    inset 0  10px 24px -16px rgba(255,255,255," + e3 + "),\n" +
+"    inset 0 -12px 28px -18px rgba(0,0,0,.60);\n" +
+"}\n" +
+"\n" +
+"/* concentric radii: inner = outer - padding */\n" +
+".tg-glass--bar { --r: " + Math.round(V.radius * 0.82) + "px; padding: 7px; }\n" +
+".tg-glass--bar .btn { border-radius: calc(var(--r) - 7px); }\n" +
+"\n" +
+"<!-- displacement map: regenerate href on resize (see index.html buildMap) -->\n" +
+"<svg width=\"0\" height=\"0\"><defs>\n" +
+"  <filter id=\"tg-refract\" filterUnits=\"userSpaceOnUse\" primitiveUnits=\"userSpaceOnUse\"\n" +
+"          color-interpolation-filters=\"sRGB\"\n" +
+"          x=\"-80\" y=\"-80\" width=\"W+160\" height=\"H+160\">\n" +
+"    <feImage href=\"data:image/png;base64,…\" x=\"0\" y=\"0\" width=\"W\" height=\"H\"\n" +
+"             preserveAspectRatio=\"none\" result=\"map\"/>\n" +
+"    <!-- chromatic dispersion: R +6.5%, G 0%, B -6.5% -->\n" +
+"    <feDisplacementMap in=\"SourceGraphic\" in2=\"map\" scale=\"" + (V.refract * 1.065).toFixed(1) + "\"\n" +
+"                       xChannelSelector=\"R\" yChannelSelector=\"G\" result=\"d0\"/>\n" +
+"    <feColorMatrix in=\"d0\" values=\"1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0\" result=\"cR\"/>\n" +
+"    <feDisplacementMap in=\"SourceGraphic\" in2=\"map\" scale=\"" + V.refract.toFixed(1) + "\"\n" +
+"                       xChannelSelector=\"R\" yChannelSelector=\"G\" result=\"d1\"/>\n" +
+"    <feColorMatrix in=\"d1\" values=\"0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0\" result=\"cG\"/>\n" +
+"    <feDisplacementMap in=\"SourceGraphic\" in2=\"map\" scale=\"" + (V.refract * 0.935).toFixed(1) + "\"\n" +
+"                       xChannelSelector=\"R\" yChannelSelector=\"G\" result=\"d2\"/>\n" +
+"    <feColorMatrix in=\"d2\" values=\"0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0\" result=\"cB\"/>\n" +
+"    <feComposite in=\"cR\" in2=\"cG\" operator=\"arithmetic\" k2=\"1\" k3=\"1\" result=\"cRG\"/>\n" +
+"    <feComposite in=\"cRG\" in2=\"cB\" operator=\"arithmetic\" k2=\"1\" k3=\"1\"/>\n" +
+"  </filter>\n" +
+"</defs></svg>\n" +
+"\n" +
+"/* degradation */\n" +
+"@media (prefers-reduced-transparency: reduce) {\n" +
+"  .tg-glass > .bd, .tg-glass > .rim { display: none; }\n" +
+"  .tg-glass > .tint { background: var(--surface-opaque); }\n" +
+"  .tg-glass > .edge { box-shadow: inset 0 0 0 1px var(--hairline); }\n" +
+"}\n" +
+"@media (prefers-reduced-motion: reduce) {\n" +
+"  .tg-glass { transition: none; }   /* no press scale, no glint easing */\n" +
+"}\n";
+}
+
+document.getElementById("copyBtn").addEventListener("click", function () {
+  const btn = this;
+  const done = function (ok) { btn.textContent = ok ? "Copied" : "Select + copy"; setTimeout(function () { btn.textContent = "Copy"; }, 1400); };
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(readout.textContent).then(function () { done(true); }, function () { selectReadout(); done(false); });
+  } else {
+    selectReadout();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    done(ok);
+  }
+});
+function selectReadout() {
+  const rng = document.createRange();
+  rng.selectNodeContents(readout);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(rng);
+}
+
+/* ==========================================================================
+   9. backdrop card grid
+   ========================================================================== */
+(function () {
+  const hues = [352, 28, 46, 140, 168, 196, 214, 258, 292, 318];
+  let out = "";
+  for (let i = 0; i < 180; i++) {
+    const h = hues[i % hues.length];
+    const h2 = (h + 34) % 360;
+    out += '<i style="background:linear-gradient(' + (120 + (i % 7) * 22) + 'deg, hsl(' + h + ' 88% ' + (52 + (i % 4) * 7) + '%), hsl(' + h2 + ' 84% ' + (38 + (i % 3) * 9) + '%))"></i>';
+  }
+  document.getElementById("cardgrid").innerHTML = out;
+})();
+
+/* ==========================================================================
+   10. footer diagnostics — so a silent failure is never invisible
+   ========================================================================== */
+document.getElementById("foot").innerHTML =
+  "Engine report · backdrop-filter: <b>" + (SUP.backdrop ? "yes" : "NO") + "</b> · " +
+  "SVG filter inside backdrop-filter: <b>" + (SUP.svgBackdrop ? "yes (Chromium)" : "no — candidates D/E fall back") + "</b> · " +
+  "mask-composite: <b>" + (SUP.maskComposite ? "yes" : "no") + "</b> · " +
+  refractors.length + " refracting surfaces live.<br>" +
+  "Displacement maps are generated on a canvas at element size and cached by geometry; resizing rebuilds them, the refraction slider only re-scales them.<br>" +
+  "Adaptive contrast is done with <b>contrast()</b> in the filter chain, not a luminosity-blend layer: a <b>mix-blend-mode</b> child isolates its parent, an isolated group is a backdrop root, and every backdrop-filter in the subtree then renders nothing. Confirmed in Chromium while building this page.";
+
+/* ==========================================================================
+   11. boot
+   ========================================================================== */
+measureAll();
+window.addEventListener("load", measureAll);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(measureAll);
+setTimeout(measureAll, 350);
+
+})();
+</script>
+</body>
+</html>

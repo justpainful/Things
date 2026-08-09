@@ -1,0 +1,37 @@
+# ── Real data must NEVER be committed. This repo is public. ────────────────
+ThingsData/
+data/
+*.sqlite
+*.sqlite-*
+*.db
+objects/
+thumbnails/
+*.thingsbackup
+*.key
+.env
+.env.*
+
+# ── Build output ──────────────────────────────────────────────────────────
+node_modules/
+dist/
+build/
+.vite/
+
+# Xcode project is GENERATED from apps/ios/project.yml — never commit it
+apps/ios/*.xcodeproj
+apps/ios/*.xcworkspace
+DerivedData/
+.build/
+*.ipa
+*.xcarchive
+*.xcresult
+
+# ── Screenshot pipeline ───────────────────────────────────────────────────
+# Baselines ARE committed; per-run output and diffs are not.
+screenshots/current/
+screenshots/diff/
+
+# ── OS noise ──────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini

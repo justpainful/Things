@@ -1,0 +1,159 @@
+# Things — XcodeGen project spec.
+#
+# This file is the ONLY source of project structure. `Things.xcodeproj` is a build
+# artifact, generated in CI and git-ignored. Nobody on this project can open Xcode to
+# repair a corrupted `.pbxproj`, and a `.pbxproj` merge conflict is unresolvable by hand at
+# speed — a YAML file is reviewable, diffable and editable from Windows.
+#
+# Generate with:  xcodegen generate --spec apps/ios/project.yml
+#
+# Deployment target is iOS 26.0: every Liquid Glass symbol is 26.0+, and there is nothing
+# below it. Build and test against the 26.5 SDK with the runner's default Xcode — never
+# pin an Xcode path, and never trigger `xcodebuild -downloadPlatform`.
+
+name: Things
+
+options:
+  bundleIdPrefix: com.things
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: false
+  developmentLanguage: en
+  groupSortPosition: top
+
+packages:
+  ThingsCore:
+    path: ../../packages/core-swift
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "26.0"
+    TARGETED_DEVICE_FAMILY: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    SWIFT_STRICT_CONCURRENCY: minimal
+    CLANG_ENABLE_MODULES: YES
+    ALWAYS_SEARCH_USER_PATHS: NO
+    # No signing settings here on purpose. The simulator build ad-hoc signs itself, and
+    # `ipa.yml` passes CODE_SIGNING_ALLOWED=NO on the command line for the archive step.
+    # Baking those in would break the test-runner install on the simulator.
+  configs:
+    Debug:
+      SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+      SWIFT_OPTIMIZATION_LEVEL: "-Onone"
+      GCC_OPTIMIZATION_LEVEL: "0"
+    Release:
+      SWIFT_COMPILATION_MODE: wholemodule
+      SWIFT_OPTIMIZATION_LEVEL: "-O"
+
+targets:
+
+  Things:
+    type: application
+    platform: iOS
+    sources:
+      - path: Things
+    dependencies:
+      - package: ThingsCore
+        product: ThingsCore
+    settings:
+      base:
+        # Stable, forever. The keychain access group is `<TeamID>.<bundleID>` — a bundle id
+        # that changes between weekly re-signs makes every stored item unreachable and the
+        # library opens empty.
+        PRODUCT_BUNDLE_IDENTIFIER: com.things.app
+        PRODUCT_NAME: Things
+        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "1.0"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        GENERATE_INFOPLIST_FILE: NO
+    info:
+      path: Things/Info.plist
+      properties:
+        CFBundleDisplayName: Things
+        CFBundleName: Things
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        LSRequiresIPhoneOS: true
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIRequiredDeviceCapabilities:
+          - arm64
+        # Face ID unlocks the device wrapper around the DEK. The PIN path always exists as
+        # the recovery route, so refusing this permission costs convenience, not data.
+        NSFaceIDUsageDescription: >-
+          Things uses Face ID to unlock your library on this iPhone. Your PIN always works
+          as well.
+        # Sync is LAN-only, peer to peer, and only ever talks to a device you have paired.
+        NSLocalNetworkUsageDescription: >-
+          Things syncs directly with your own computer over your local network. Nothing is
+          sent to the internet.
+        NSBonjourServices:
+          - _things-sync._tcp
+          - _things-sync._udp
+        # Import and export happen in the app — there are no extensions — so the Files app
+        # needs to be able to hand documents over.
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+        ITSAppUsesNonExemptEncryption: false
+        UIApplicationSupportsIndirectInputEvents: true
+
+  ThingsTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: ThingsTests
+    dependencies:
+      - target: Things
+      - package: ThingsCore
+        product: ThingsCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.things.app.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+  ThingsUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: ThingsUITests
+    dependencies:
+      - target: Things
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.things.app.uitests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+
+  Things:
+    build:
+      targets:
+        Things: all
+        ThingsTests: [test]
+        ThingsUITests: [test]
+      parallelizeBuild: true
+    run:
+      config: Debug
+      # Fixed locale and timezone so a screenshot taken on Tuesday matches Monday's.
+      environmentVariables:
+        TZ: UTC
+    test:
+      config: Debug
+      gatherCoverageData: false
+      # One test plan's worth of ordering: unit tests first so a logic failure does not
+      # cost a simulator boot.
+      targets:
+        - ThingsTests
+        - ThingsUITests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
