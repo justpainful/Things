@@ -133,6 +133,11 @@ targets:
       - target: Things
       - package: ThingsCore
         product: ThingsCore
+      # Same reason as the app target: SeedDataTests calls GRDB extension methods
+      # (`String.fetchAll(db, sql:)`, `StatementArguments`) on ThingsCore types. Compiles
+      # without an `import GRDB`, does not link without this line.
+      - package: GRDB
+        product: GRDB
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.things.app.tests
