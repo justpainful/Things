@@ -167,6 +167,16 @@ final class ScreenshotTour: XCTestCase {
                 dismissOverlay()
             }
 
+            // EDITING — the whole point of the app, and something a resting screenshot
+            // cannot demonstrate. Tap a value, type into it, photograph it mid-edit.
+            let usernameRow = app.staticTexts["studio-admin"].firstMatch
+            if canTouch(usernameRow) {
+                usernameRow.tap()
+                app.typeText("-edited")
+                snap(28, "field-editing", mode)
+                dismissOverlay()
+            }
+
             // Add Field sheet.
             if tap(identifier: "detail.addField") {
                 snap(5, "add-field-sheet", mode)
@@ -462,9 +472,17 @@ final class ScreenshotTour: XCTestCase {
     }
 
     /// Dismisses a context menu or a popover without needing to know where it is.
+    /// Dismisses a context menu by tapping outside it.
+    ///
+    /// NOT the top centre. (0.5, 0.05) is the Dynamic Island on an iPhone 17 Pro, so the tap
+    /// goes to the system instead of the app, the menu stays up, and every step afterwards
+    /// hits a dimmed overlay. That single coordinate silently cost half the tour — Add Field,
+    /// History, sections, the long note, the gallery, the photo viewer, New Thing, Settings,
+    /// Trash, Conflicts and Diagnostics all went missing while the run stayed green.
+    ///
+    /// The left edge at mid-height is outside any menu and is not a control on any screen.
     private func dismissOverlay() {
-        let corner = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.05))
-        corner.tap()
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.04, dy: 0.45)).tap()
     }
 
     private func typeIntoSearch(_ text: String) {
