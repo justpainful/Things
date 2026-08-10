@@ -1,65 +1,70 @@
+<div align="center">
+
 # Things
 
-**Everything, in one place.**
+A local system for keeping accounts, files, links, notes and structured personal data in one place.
 
-A completely local personal information system. Accounts, passwords, files, photos, links, notes,
-paths, and cards — all as one flexible kind of item called a **Thing**.
+</div>
 
-Not a notes app. Not a file manager. Not a password manager. Not a bookmark manager.
-It is the place where one item can be all four at once.
+## Overview
 
-> The user does not adapt to the database. The database adapts to the thing the user wants to keep.
+Things is built around one flexible item type called a `Thing`. A Thing can hold text, credentials, files, paths, links, images and custom fields without forcing the user into separate apps or rigid categories.
 
----
+The system has two clients:
 
-## Run it
+- Native SwiftUI app for iPhone
+- Local web interface for desktop
+
+Both use the same data model and sync directly over the local network.
+
+## Platform
+
+| Area | Implementation |
+|---|---|
+| iPhone | SwiftUI, iOS 26, Liquid Glass |
+| Desktop | Local web client |
+| Local service | TypeScript |
+| iOS core | Swift |
+| Storage | Local database and object storage |
+| Sync | Direct LAN sync |
+| Cloud | None |
+| Accounts | None |
+
+## Running the desktop client
 
 ```bash
 npm install
-npm run dev          # http://localhost:6767
+npm run dev
 ```
 
-Full instructions, including LAN sync setup and troubleshooting:
-[`docs/06-RUNBOOK.md`](docs/06-RUNBOOK.md).
+The local interface is available at:
 
-## Status
+```text
+http://localhost:6767
+```
 
-Both cores, the local service, the web client, and the iOS app are implemented.
-The iOS half has **never been compiled** — there is no Mac on this project, so its first build
-happens on a GitHub Actions macOS runner.
+Full setup instructions are in [`docs/06-RUNBOOK.md`](docs/06-RUNBOOK.md).
 
-| Document | Contents |
+## Design
+
+A Thing is composed from sections and fields rather than a fixed record type. This lets the same model represent a login, a note, a saved file, a payment card, a link collection or a mixed record containing several of them.
+
+The TypeScript and Swift cores are implemented separately and checked against shared conformance vectors. A change that produces different results between platforms fails validation before release.
+
+## Documentation
+
+| Document | Purpose |
 |---|---|
-| [00-PLAN](docs/00-PLAN.md) | Constraints, architecture, milestones, the operating loop, risks |
-| [01-DATA-MODEL](docs/01-DATA-MODEL.md) | Thing / Section / Field, kinds + variants, objects, oplog, conflicts |
-| [02-SECURITY](docs/02-SECURITY.md) | Threat model, PIN + device-bound keys, lock behaviour, network posture |
-| [03-DESIGN](docs/03-DESIGN.md) | Palette, Liquid Glass rules, web↔iPhone parity, screen inventory |
-| [04-CI-AND-LOOP](docs/04-CI-AND-LOOP.md) | macOS CI, Screenshot Tour, IPA build, review loop |
-| [05-OPEN-QUESTIONS](docs/05-OPEN-QUESTIONS.md) | Decisions still open |
-| [06-RUNBOOK](docs/06-RUNBOOK.md) | How to run, develop, ship, and debug it |
+| [`00-PLAN`](docs/00-PLAN.md) | Project scope and milestones |
+| [`01-DATA-MODEL`](docs/01-DATA-MODEL.md) | Thing, Section and Field model |
+| [`02-SECURITY`](docs/02-SECURITY.md) | Threat model and key handling |
+| [`03-DESIGN`](docs/03-DESIGN.md) | UI rules and platform parity |
+| [`04-CI-AND-LOOP`](docs/04-CI-AND-LOOP.md) | CI and screenshot workflow |
+| [`05-OPEN-QUESTIONS`](docs/05-OPEN-QUESTIONS.md) | Decisions still open |
+| [`06-RUNBOOK`](docs/06-RUNBOOK.md) | Development and release workflow |
 
-| Spec (normative) | Contents |
-|---|---|
-| [schema.sql](spec/schema.sql) | Canonical DDL |
-| [field-kinds.json](spec/field-kinds.json) | Field kinds, variants, templates, smart views |
-| [crypto.md](spec/crypto.md) | Key hierarchy, envelope formats, framed objects |
-| [oplog.md](spec/oplog.md) | HLC wire format, canonical JSON, attribute encoding |
-| [search.md](spec/search.md) | Query grammar and evaluation |
-| [sync.md](spec/sync.md) | Discovery, pairing, transfer, conflicts |
-| [vectors/](spec/vectors) | Conformance vectors both cores must pass |
+The canonical technical specifications live under `spec/`.
 
-The two cores are written independently in TypeScript and Swift and held in agreement by those
-vectors rather than by shared code — if they ever disagree, a test goes red before a user notices.
+## Privacy
 
-## Shape
-
-- **iPhone** — SwiftUI, native, Liquid Glass, Face ID. No React Native, no Flutter, no WebView.
-- **Desktop** — a local service on the PC; the client is a web UI at `http://localhost:6767`.
-- **Sync** — direct over the local network between the two. Nothing else.
-- **Cloud** — none. No accounts, no telemetry, no analytics, no external API is required to use it.
-
-## A note on privacy
-
-This repository contains **code and documentation only**. It never contains a database, a key, a
-PIN, a backup, or a screenshot taken from real data. Screenshots in CI are generated exclusively
-from a fictional seed dataset.
+Things is designed to operate without a cloud service. Real user databases, keys, PINs and backups are not stored in the repository. CI screenshots use generated test data only.
